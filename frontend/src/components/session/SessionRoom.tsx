@@ -1,3 +1,120 @@
-import { WarningCircle as AlertCircle,DownloadSimple,Microphone,MicrophoneSlash,PaperPlaneTilt,Pause,PhoneDisconnect,Play,ShieldCheck,Star,VideoCamera,VideoCameraSlash,X } from "@phosphor-icons/react";import { useEffect,useRef,useState,type FormEvent,type KeyboardEvent } from "react";import { useLocation,useNavigate,useParams } from "react-router-dom";import { SOCKET_EVENTS,type SessionMatch } from "@bodhi/shared";import { getSocket } from "../../lib/socket";import { api } from "../../lib/api";import { Button } from "../ui/Button";
-type Message={id:string;body:string;sentAt:string;sender:string;own?:boolean};const replies=["I'm feeling anxious","I need help","I'm not okay","Thank you for listening","Can we talk more?"];
-export function SessionRoom(){const{sessionId}=useParams();const location=useLocation();const navigate=useNavigate();const match=location.state as(SessionMatch&{mood?:string;urgent?:boolean})|undefined;const[messages,setMessages]=useState<Message[]>([]);const[draft,setDraft]=useState("");const[paused,setPaused]=useState(false);const[seconds,setSeconds]=useState(0);const[ratingOpen,setRatingOpen]=useState(false);const[rating,setRating]=useState(0);const[toast,setToast]=useState("");const[muted,setMuted]=useState(false);const[cameraOff,setCameraOff]=useState(false);const[mediaError,setMediaError]=useState("");const localVideo=useRef<HTMLVideoElement>(null);const remoteVideo=useRef<HTMLVideoElement>(null);const bottom=useRef<HTMLDivElement>(null);const pc=useRef<RTCPeerConnection|null>(null);useEffect(()=>{const timer=setInterval(()=>setSeconds(v=>v+1),1000);return()=>clearInterval(timer)},[]);useEffect(()=>bottom.current?.scrollIntoView({behavior:"smooth"}),[messages]);useEffect(()=>{if(!sessionId)return;const socket=getSocket();socket.emit(SOCKET_EVENTS.SESSION_JOIN,{sessionId});const receive=(message:Message)=>setMessages(v=>[...v,message]);const ended=()=>setRatingOpen(true);socket.on(SOCKET_EVENTS.SESSION_MESSAGE,receive);socket.on(SOCKET_EVENTS.SESSION_END,ended);if(match?.mode!=="chat")void setupMedia(socket);return()=>{socket.off(SOCKET_EVENTS.SESSION_MESSAGE,receive);socket.off(SOCKET_EVENTS.SESSION_END,ended);pc.current?.close();Array.from((localVideo.current?.srcObject as MediaStream|null)?.getTracks()??[]).forEach(track=>track.stop())}},[sessionId]);async function setupMedia(socket:any){try{const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:match?.mode==="video"});if(localVideo.current)localVideo.current.srcObject=stream;const peer=new RTCPeerConnection({iceServers:[{urls:import.meta.env.VITE_STUN_URL??"stun:stun.l.google.com:19302"}]});pc.current=peer;stream.getTracks().forEach(track=>peer.addTrack(track,stream));peer.ontrack=e=>{if(remoteVideo.current)remoteVideo.current.srcObject=e.streams[0]};peer.onicecandidate=e=>e.candidate&&socket.emit(SOCKET_EVENTS.SESSION_SIGNAL,{sessionId,signal:{candidate:e.candidate}});socket.on(SOCKET_EVENTS.SESSION_SIGNAL,async({signal}:any)=>{if(signal.sdp){await peer.setRemoteDescription(signal.sdp);if(signal.sdp.type==="offer"){const answer=await peer.createAnswer();await peer.setLocalDescription(answer);socket.emit(SOCKET_EVENTS.SESSION_SIGNAL,{sessionId,signal:{sdp:answer}})}}else if(signal.candidate)await peer.addIceCandidate(signal.candidate)});if(location.pathname.startsWith("/psychologist")){const offer=await peer.createOffer();await peer.setLocalDescription(offer);socket.emit(SOCKET_EVENTS.SESSION_SIGNAL,{sessionId,signal:{sdp:offer}})}}catch{setMediaError("Microphone or camera permission was not granted.")}}function send(){const body=draft.trim();if(!body)return;const message={id:crypto.randomUUID(),body,sentAt:new Date().toISOString(),sender:"me",own:true};setMessages(v=>[...v,message]);getSocket().emit(SOCKET_EVENTS.SESSION_MESSAGE,{sessionId,body});setDraft("")}function submit(e:FormEvent){e.preventDefault();send()}function keys(e:KeyboardEvent<HTMLTextAreaElement>){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}}function end(){getSocket().emit(SOCKET_EVENTS.SESSION_END,{sessionId});setRatingOpen(true)}function save(){const text=messages.map(m=>`[${new Date(m.sentAt).toLocaleTimeString()}] ${m.own?"You":m.sender}: ${m.body}`).join("\n");const link=document.createElement("a");link.href=URL.createObjectURL(new Blob([text],{type:"text/plain"}));link.download=`bodhi-session-${sessionId}.txt`;link.click();URL.revokeObjectURL(link.href);setToast("Conversation saved locally") }async function escalate(){try{await api(`/sessions/${sessionId}/escalate`,{method:"POST"});setToast("Safety alert sent to the administration team")}catch(e){setToast((e as Error).message)}}async function submitRating(){if(rating)await api(`/sessions/${sessionId}/rating`,{method:"POST",body:JSON.stringify({rating})});navigate(-1)}const time=`${String(Math.floor(seconds/60)).padStart(2,"0")}:${String(seconds%60).padStart(2,"0")}`;return <section className="enhanced-session">{toast&&<div className="session-toast">{toast}<button onClick={()=>setToast("")}><X/></button></div>}<header className="session-top"><div className="session-peer"><span>{match?.peerLabel?.[0]??"P"}<i/></span><div><strong>{match?.peerLabel??"Bodhi-Mitra psychologist"}</strong><small>{paused?"Paused":`Live · ${time}`}</small></div></div><div className="session-actions"><b><ShieldCheck/> Anonymous</b><button onClick={save} title="Save transcript"><DownloadSimple/></button><button className="unsafe" onClick={escalate}><AlertCircle/> I feel unsafe</button><button onClick={end}><PhoneDisconnect/> End</button></div></header>{(match?.mood||match?.urgent)&&<div className="mood-bar">Feeling: {match.mood??"Not shared"}{match.urgent&&<b>Urgent</b>}</div>}{paused&&<div className="pause-banner"><Pause/> Session paused. Take your time.<Button onClick={()=>setPaused(false)}><Play/> Resume</Button></div>}{match?.mode==="chat"||!match?<div className="enhanced-chat"><div className="messages" aria-live="polite">{messages.length?messages.map(m=><div key={m.id} className={m.own?"message own":"message"}><p>{m.body}</p><small>{new Date(m.sentAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</small></div>):<div className="session-empty"><img src="/images/pschylogo.svg" alt=""/><h2>Session started</h2><p>Your psychologist is here. Share when you feel ready.</p><small><ShieldCheck/> Private and anonymous-facing</small></div>}<div ref={bottom}/></div><div className="quick-replies">{replies.map(text=><button key={text} onClick={()=>setDraft(text)}>{text}</button>)}<button className="pause-chip" onClick={()=>setPaused(true)}><Pause/> I need a moment</button></div><form onSubmit={submit}><textarea rows={1} value={draft} onChange={e=>setDraft(e.target.value)} onKeyDown={keys} placeholder="Share what's on your mind... (Enter to send)"/><Button disabled={!draft.trim()}><PaperPlaneTilt/></Button></form></div>:<div className="call"><video ref={remoteVideo} autoPlay playsInline/><video className="local-video" ref={localVideo} autoPlay playsInline muted/>{mediaError&&<div className="form-error">{mediaError}</div>}<div className="call-controls"><Button onClick={()=>{const t=(localVideo.current?.srcObject as MediaStream)?.getAudioTracks()[0];if(t){t.enabled=muted;setMuted(!muted)}}}>{muted?<MicrophoneSlash/>:<Microphone/>}</Button>{match.mode==="video"&&<Button onClick={()=>{const t=(localVideo.current?.srcObject as MediaStream)?.getVideoTracks()[0];if(t){t.enabled=cameraOff;setCameraOff(!cameraOff)}}}>{cameraOff?<VideoCameraSlash/>:<VideoCamera/>}</Button>}</div></div>}{ratingOpen&&<div className="student-modal-backdrop"><div className="student-modal rating-modal"><Star/><h2>How was your session?</h2><div>{[1,2,3,4,5].map(value=><button className={value<=rating?"active":""} onClick={()=>setRating(value)} key={value}><Star weight={value<=rating?"fill":"regular"}/></button>)}</div><Button variant="secondary" onClick={()=>navigate(-1)}>Skip</Button><Button disabled={!rating} onClick={submitRating}>Submit feedback</Button></div></div>}</section>}
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { SOCKET_EVENTS, type SessionMatch } from "@bodhi/shared";
+import { useAuth } from "../../context/AuthContext";
+import { api } from "../../lib/api";
+import { getSocket } from "../../lib/socket";
+import { PsychologistSessionView, StudentSessionView, type SessionMessage } from "./SessionRoleViews";
+
+type MatchContext = SessionMatch & { mood?: string; urgent?: boolean };
+
+export function SessionRoom() {
+  const { sessionId = "" } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const match = location.state as MatchContext | undefined;
+  const isPsychologist = user?.role === "psychologist";
+  const [messages, setMessages] = useState<SessionMessage[]>([]);
+  const [draft, setDraft] = useState("");
+  const [paused, setPaused] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+  const [ratingOpen, setRatingOpen] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [ended, setEnded] = useState(false);
+  const [toast, setToast] = useState("");
+  const [muted, setMuted] = useState(false);
+  const [cameraOff, setCameraOff] = useState(false);
+  const [mediaError, setMediaError] = useState("");
+  const localVideo = useRef<HTMLVideoElement>(null);
+  const remoteVideo = useRef<HTMLVideoElement>(null);
+  const bottom = useRef<HTMLDivElement>(null);
+  const peerConnection = useRef<RTCPeerConnection | null>(null);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setSeconds(value => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    const socket = getSocket();
+    socket.emit(SOCKET_EVENTS.SESSION_JOIN, { sessionId });
+    const receive = (message: SessionMessage) => setMessages(current => [...current, message]);
+    const sessionEnded = () => { setEnded(true); if (!isPsychologist) setRatingOpen(true); };
+    socket.on(SOCKET_EVENTS.SESSION_MESSAGE, receive);
+    socket.on(SOCKET_EVENTS.SESSION_END, sessionEnded);
+    if (match?.mode && match.mode !== "chat") void setupMedia(socket);
+    return () => {
+      socket.off(SOCKET_EVENTS.SESSION_MESSAGE, receive);
+      socket.off(SOCKET_EVENTS.SESSION_END, sessionEnded);
+      socket.off(SOCKET_EVENTS.SESSION_SIGNAL);
+      peerConnection.current?.close();
+      Array.from((localVideo.current?.srcObject as MediaStream | null)?.getTracks() ?? []).forEach(track => track.stop());
+    };
+  }, [sessionId, isPsychologist]);
+
+  async function setupMedia(socket: ReturnType<typeof getSocket>) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: match?.mode === "video" });
+      if (localVideo.current) localVideo.current.srcObject = stream;
+      const iceServers: RTCIceServer[] = [{ urls: import.meta.env.VITE_STUN_URL ?? "stun:stun.l.google.com:19302" }];
+      if (import.meta.env.VITE_TURN_URL) iceServers.push({ urls: import.meta.env.VITE_TURN_URL, username: import.meta.env.VITE_TURN_USERNAME, credential: import.meta.env.VITE_TURN_CREDENTIAL });
+      const peer = new RTCPeerConnection({ iceServers });
+      peerConnection.current = peer;
+      stream.getTracks().forEach(track => peer.addTrack(track, stream));
+      peer.ontrack = event => { if (remoteVideo.current) remoteVideo.current.srcObject = event.streams[0]; };
+      peer.onicecandidate = event => event.candidate && socket.emit(SOCKET_EVENTS.SESSION_SIGNAL, { sessionId, signal: { candidate: event.candidate } });
+      const receiveSignal = async ({ signal }: { signal: { sdp?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit } }) => {
+        if (signal.sdp) {
+          await peer.setRemoteDescription(signal.sdp);
+          if (signal.sdp.type === "offer") {
+            const answer = await peer.createAnswer(); await peer.setLocalDescription(answer);
+            socket.emit(SOCKET_EVENTS.SESSION_SIGNAL, { sessionId, signal: { sdp: answer } });
+          }
+        } else if (signal.candidate) await peer.addIceCandidate(signal.candidate);
+      };
+      socket.on(SOCKET_EVENTS.SESSION_SIGNAL, receiveSignal);
+      if (isPsychologist) {
+        const offer = await peer.createOffer(); await peer.setLocalDescription(offer);
+        socket.emit(SOCKET_EVENTS.SESSION_SIGNAL, { sessionId, signal: { sdp: offer } });
+      }
+    } catch { setMediaError("Microphone or camera access was not granted. Check your browser permissions and try again."); }
+  }
+
+  function send() {
+    const body = draft.trim();
+    if (!body || ended) return;
+    setMessages(current => [...current, { id: crypto.randomUUID(), body, sentAt: new Date().toISOString(), sender: user?.role ?? "me", own: true }]);
+    getSocket().emit(SOCKET_EVENTS.SESSION_MESSAGE, { sessionId, body });
+    setDraft("");
+  }
+
+  function submit(event: FormEvent) { event.preventDefault(); send(); }
+  function handleKeys(event: KeyboardEvent<HTMLTextAreaElement>) { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }
+  function endSession() { if (ended) return; getSocket().emit(SOCKET_EVENTS.SESSION_END, { sessionId }); setEnded(true); if (!isPsychologist) setRatingOpen(true); }
+  function toggleAudio() { const track = (localVideo.current?.srcObject as MediaStream | null)?.getAudioTracks()[0]; if (track) { track.enabled = muted; setMuted(!muted); } }
+  function toggleVideo() { const track = (localVideo.current?.srcObject as MediaStream | null)?.getVideoTracks()[0]; if (track) { track.enabled = cameraOff; setCameraOff(!cameraOff); } }
+  function saveTranscript() {
+    const text = messages.map(message => `[${new Date(message.sentAt).toLocaleTimeString()}] ${message.own ? "You" : message.sender}: ${message.body}`).join("\n");
+    const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([text], { type: "text/plain" })); link.download = `bodhi-session-${sessionId}.txt`; link.click(); URL.revokeObjectURL(link.href);
+    setToast("Transcript saved only on this device");
+  }
+  async function escalate() { try { await api(`/sessions/${sessionId}/escalate`, { method: "POST" }); setToast("Safety alert sent to the administration team"); } catch (error) { setToast((error as Error).message); } }
+  async function submitRating() { if (rating) await api(`/sessions/${sessionId}/rating`, { method: "POST", body: JSON.stringify({ rating }) }); navigate(-1); }
+
+  const shared = {
+    sessionId, match, messages, draft, setDraft, paused, setPaused, ended, toast, setToast,
+    time: `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`,
+    bottom, submit, handleKeys, endSession, saveTranscript, escalate, localVideo, remoteVideo,
+    muted, cameraOff, toggleAudio, toggleVideo, mediaError,
+  };
+
+  return isPsychologist
+    ? <PsychologistSessionView {...shared} onExit={() => navigate("/psychologist/sessions")} />
+    : <StudentSessionView {...shared} ratingOpen={ratingOpen} rating={rating} setRating={setRating} submitRating={submitRating} skipRating={() => navigate(-1)} />;
+}
