@@ -4,6 +4,7 @@ export const roles = ["student", "psychologist", "admin"] as const;
 export const sessionModes = ["chat", "voice", "video"] as const;
 export const requestStatuses = ["pending", "matched", "timeout", "cancelled", "ended"] as const;
 export const specializations = ["Anxiety", "Depression", "Trauma", "Addiction", "Relationships", "Academic Stress", "Grief"] as const;
+export const expertCategories = ["senior", "consultant", "trainee"] as const;
 export const departments = [
   "School of Management (SoM)",
   "School of Biotechnology (SoBT)",
@@ -35,7 +36,9 @@ export const psychologistSchema = z.object({
   name: z.string().trim().min(2).max(100), email: emailSchema,
   password: z.string().min(10).max(128).optional(),
   professionalTitle: z.string().trim().min(3).max(100).default("Clinical Psychologist"),
-  specializations: z.array(z.string().trim().min(2).max(80)).min(1).max(20), verified: z.boolean().default(false), isActive: z.boolean().default(true)
+  specializations: z.array(z.string().trim().min(2).max(80)).min(1).max(20),
+  expertCategory: z.enum(expertCategories).default("consultant"), portraitUrl: z.string().trim().max(300).optional(),
+  verified: z.boolean().default(false), isActive: z.boolean().default(true)
 });
 
 export interface SafeUser { id: string; role: Role; displayName: string; department?: string; email?: string; rollNumber?: string; mobileNumber?: string; mustChangePassword?: boolean }
