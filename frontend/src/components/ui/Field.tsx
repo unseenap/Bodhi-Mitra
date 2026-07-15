@@ -1,0 +1,2 @@
+import type { InputHTMLAttributes } from "react";
+export function Field({ label, error, hint, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string; hint?: string }) { const id = props.id ?? props.name; return <label className="field" htmlFor={id}><span>{label}</span><input id={id} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} {...props}/>{hint && <small>{hint}</small>}{error && <small className="field__error" id={`${id}-error`}>{error}</small>}</label>; }

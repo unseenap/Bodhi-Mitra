@@ -1,0 +1,6 @@
+{
+  "name": "@bodhi/frontend", "version": "1.0.0", "private": true, "type": "module",
+  "scripts": { "dev": "vite", "build": "tsc -b && vite build", "typecheck": "tsc --noEmit", "test": "vitest run", "lint": "eslint src" },
+  "dependencies": { "@bodhi/shared": "*", "@fontsource/manrope": "^5.2.6", "@phosphor-icons/react": "^2.1.10", "clsx": "^2.1.1", "react": "^19.1.0", "react-dom": "^19.1.0", "react-router-dom": "^7.7.0", "socket.io-client": "^4.8.1", "zod": "^3.25.76" },
+  "devDependencies": { "@types/react": "^19.1.8", "@types/react-dom": "^19.1.6", "@vitejs/plugin-react": "^4.6.0", "eslint": "^9.31.0", "typescript": "^5.8.3", "vite": "^7.0.5", "vitest": "^3.2.4" }
+}

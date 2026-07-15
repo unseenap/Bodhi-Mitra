@@ -1,0 +1,21 @@
+node_modules/
+dist/
+# Local environment files and deployment secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+
+# Package-manager authentication
+.npmrc
+coverage/
+*.log
+.DS_Store
+frontend/public/sw.js

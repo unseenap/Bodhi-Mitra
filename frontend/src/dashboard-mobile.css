@@ -1,0 +1,7 @@
+@media (max-width: 767px) {
+  .dashboard > aside { position: fixed; z-index: 30; left: 0; right: 0; bottom: 0; height: 70px; padding: .5rem 1rem; display: block; }
+  .dashboard > aside > .brand, .dashboard > aside > .account { display: none; }
+  .dashboard > aside nav { display: flex; justify-content: space-around; overflow: visible; }
+  .dashboard > aside nav a { font-size: .72rem; padding: .7rem .65rem; }
+  .dashboard > main { padding-bottom: 78px; }
+}

@@ -1,0 +1,2 @@
+import type { SelectHTMLAttributes } from "react";
+export function SelectField({ label, options, hint, ...props }: SelectHTMLAttributes<HTMLSelectElement> & { label: string; options: readonly string[]; hint?: string }) { const id = props.id ?? props.name; return <label className="field" htmlFor={id}><span>{label}</span><select id={id} {...props}><option value="">Select your department</option>{options.map(option => <option key={option} value={option}>{option}</option>)}</select>{hint && <small>{hint}</small>}</label>; }

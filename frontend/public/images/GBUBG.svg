@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+  <!-- Base gradient -->
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EDE9FE" />
+      <stop offset="100%" stop-color="#F5F3FF" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)" />
+
+  <!-- Campus buildings (simplified silhouette) -->
+  <g fill="#312E81" opacity="0.04">
+    <!-- Main building (center) -->
+    <rect x="550" y="500" width="100" height="150" rx="5"/>
+    <rect x="560" y="480" width="80" height="20" rx="3"/> <!-- Roof -->
+    
+    <!-- Left wing -->
+    <rect x="450" y="520" width="80" height="120" rx="5"/>
+    <rect x="460" y="500" width="60" height="20" rx="3"/>
+    
+    <!-- Right wing -->
+    <rect x="670" y="520" width="80" height="120" rx="5"/>
+    <rect x="680" y="500" width="60" height="20" rx="3"/>
+    
+    <!-- Tower on left -->
+    <rect x="400" y="450" width="30" height="200" rx="3"/>
+    <polygon points="400,450 415,430 430,450" fill="#312E81" opacity="0.04"/>
+    
+    <!-- Tower on right -->
+    <rect x="770" y="450" width="30" height="200" rx="3"/>
+    <polygon points="770,450 785,430 800,450" fill="#312E81" opacity="0.04"/>
+  </g>
+
+  <!-- Trees (left & right) -->
+  <g fill="#7C3AED" opacity="0.03">
+    <!-- Left tree cluster -->
+    <circle cx="350" cy="600" r="40"/>
+    <circle cx="370" cy="580" r="35"/>
+    <circle cx="330" cy="590" r="30"/>
+    
+    <!-- Right tree cluster -->
+    <circle cx="850" cy="600" r="40"/>
+    <circle cx="830" cy="580" r="35"/>
+    <circle cx="870" cy="590" r="30"/>
+    
+    <!-- Central tree -->
+    <circle cx="600" cy="620" r="45"/>
+    <circle cx="600" cy="590" r="35"/>
+  </g>
+
+  <!-- Gentle grid lines (academic feel) -->
+  <g stroke="#7C3AED" stroke-width="0.5" opacity="0.02">
+    {Array.from({ length: 20 }).map((_, i) => (
+      <>
+        <line x1={i * 60} y1="0" x2={i * 60} y2="800" />
+        <line x1="0" y1={i * 40} x2="1200" y2={i * 40} />
+      </>
+    ))}
+  </g>
+</svg>

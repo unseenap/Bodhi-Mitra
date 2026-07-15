@@ -1,0 +1,2 @@
+.field select { width: 100%; border: 1px solid #84958f; border-radius: 9px; padding: .8rem; background: #fff; color: var(--ink); }
+.field select:focus { outline: 3px solid #99ccc4; outline-offset: 1px; }

@@ -1,0 +1,3 @@
+import { api } from "./api";
+function decode(value:string){const padding="=".repeat((4-value.length%4)%4);const raw=atob((value+padding).replace(/-/g,"+").replace(/_/g,"/"));return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)))}
+export async function enablePush(){const key=import.meta.env.VITE_VAPID_PUBLIC_KEY;if(!key)throw new Error("Push notifications are not configured");if(await Notification.requestPermission()!=="granted")throw new Error("Notification permission was not granted");const registration=await navigator.serviceWorker.register("/sw.js");const subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:decode(key)});await api("/psychologist/push-subscription",{method:"POST",body:JSON.stringify(subscription)})}
