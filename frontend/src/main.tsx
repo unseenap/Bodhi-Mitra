@@ -21,6 +21,8 @@ import "./emergency-workflow.css";
 import "./emergency-confirmation.css";
 import "./experts-directory.css";
 import "./expert-admin.css";
+import "./auth-experience.css";
+import "./footer-system.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
