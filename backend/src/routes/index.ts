@@ -6,6 +6,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { adminAnalytics, adminReports, adminSessions, adminStudents, resolveReport } from "../controllers/admin.controller.js";
 import { escalateSession, rateSession } from "../controllers/session.controller.js";
 import { psychologistProfile, psychologistSummary, setAvailability } from "../controllers/psychologist.controller.js";
+import { adminAssessments, assessmentStatus, submitAssessment } from "../controllers/assessment.controller.js";
 
 export const api = Router();
 const otpLimit = rateLimit({ windowMs: 10 * 60 * 1000, limit: 3, standardHeaders: true, legacyHeaders: false, message: { message: "Too many code requests. Please wait before trying again" } });
@@ -17,6 +18,8 @@ api.post("/auth/login", rateLimit({ windowMs: 15 * 60 * 1000, limit: 10 }), pass
 api.get("/auth/me", requireAuth(), me);
 api.get("/experts", experts);
 api.get("/student/history", requireAuth(["student"]), studentHistory);
+api.get("/student/assessment", requireAuth(["student"]), assessmentStatus);
+api.post("/student/assessment", requireAuth(["student"]), submitAssessment);
 api.get("/psychologist/queue", requireAuth(["psychologist"]), psychologistQueue);
 api.get("/psychologist/sessions", requireAuth(["psychologist"]), sessionHistory);
 api.get("/psychologist/summary", requireAuth(["psychologist"]), psychologistSummary);
@@ -31,6 +34,7 @@ api.get("/admin/analytics", requireAuth(["admin"]), adminAnalytics);
 api.get("/admin/students", requireAuth(["admin"]), adminStudents);
 api.get("/admin/sessions", requireAuth(["admin"]), adminSessions);
 api.get("/admin/reports", requireAuth(["admin"]), adminReports);
+api.get("/admin/assessments", requireAuth(["admin"]), adminAssessments);
 api.patch("/admin/reports/:id/resolve", requireAuth(["admin"]), resolveReport);
 api.post("/sessions/:sessionId/rating", requireAuth(["student"]), rateSession);
 api.post("/sessions/:sessionId/escalate", requireAuth(["student", "psychologist"]), escalateSession);

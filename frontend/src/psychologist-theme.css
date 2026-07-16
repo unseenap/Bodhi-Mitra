@@ -1,0 +1,54 @@
+/* Align the psychologist portal with the established Bodhi-Mitra violet system. */
+.psych-page { color: #312e81; }
+.psych-command-head,
+.psych-queue-panel,
+.psych-care-rail > section,
+.psych-metrics,
+.psych-history article,
+.psych-profile { border-color: #ddd6fe; }
+.psych-command-mark,
+.psych-metrics svg,
+.queue-mode,
+.psych-empty > span,
+.psych-history article > b,
+.psych-profile-avatar { background: #ede9fe; color: #7c3aed; }
+.psych-command-copy p,
+.psych-section-head a,
+.readiness > svg,
+.mode-row svg,
+.psych-history article > svg { color: #7c3aed; }
+.psych-command-copy h1,
+.psych-section-head h1,
+.psych-section-head h2,
+.psych-metrics strong,
+.psych-empty h3,
+.readiness strong,
+.psych-profile h1 { color: #312e81; }
+.psych-command-copy > div > span,
+.psych-section-head p,
+.psych-metrics span,
+.psych-metrics small,
+.psych-empty p,
+.psych-notification-button small,
+.readiness small,
+.psych-history article span { color: #6b5b95; }
+.availability { border-color: #ddd6fe; background: #f5f3ff; color: #5b21b6; }
+.availability:hover { border-color: #a78bfa; }
+.availability.active { border-color: #c4b5fd; background: #ede9fe; color: #5b21b6; }
+.availability.active svg { color: #7c3aed; }
+.availability small { color: #6b5b95; }
+.psych-notice { border-color: #c4b5fd; background: #ede9fe; color: #5b21b6; }
+.psych-metrics article { border-color: #ede9fe; }
+.psych-metrics .psych-metric-primary { background: #f5f3ff; }
+.psych-queue article { border-color: #ede9fe; background: #fdfcff; }
+.psych-queue article:hover { border-color: #c4b5fd; background: #f8f7ff; }
+.psych-queue .button { background: #7c3aed; }
+.psych-queue .button:hover { background: #6d28d9; }
+.psych-notification-button { border-color: #ddd6fe; background: #f5f3ff; color: #5b21b6; }
+.psych-notification-button:hover { border-color: #a78bfa; }
+.readiness { border-color: #ede9fe; }
+.mode-row { background: #f5f3ff; color: #5b5275; }
+.mode-row b { color: #312e81; }
+.psych-profile-cover { background: linear-gradient(135deg, #4c1d95, #7c3aed); }
+.psych-profile-info > div { background: #f5f3ff; }
+.verified-badge { background: #ede9fe; color: #5b21b6; }

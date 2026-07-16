@@ -1,0 +1,24 @@
+export type AssessmentLanguage="en"|"hi";
+export const pwqQuestions=[
+{en:"Have you had trouble falling asleep, woken often during the night, or felt tired in the morning even after sleeping?",hi:"क्या आपको नींद आने में परेशानी हुई है, रात में बार-बार नींद खुली है, या सोने के बाद भी सुबह थकान महसूस हुई है?"},
+{en:"Have you noticed a clear decrease or increase in appetite, eaten much less or more than usual, or experienced an unusual change in taste?",hi:"क्या आपकी भूख में स्पष्ट कमी या वृद्धि हुई है, आप सामान्य से बहुत कम या अधिक खा रहे हैं, या स्वाद में असामान्य बदलाव महसूस हुआ है?"},
+{en:"Have you interacted or met with friends, classmates, or colleagues significantly less than usual?",hi:"क्या आपने सामान्य की तुलना में दोस्तों, सहपाठियों या सहकर्मियों से मिलना-जुलना काफी कम कर दिया है?"},
+{en:"Have you felt low or had less interest or enjoyment in activities you previously found pleasurable?",hi:"क्या आपका मन उदास रहा है या जिन गतिविधियों में पहले आनंद आता था, उनमें रुचि या आनंद कम हुआ है?"},
+{en:"Have conflicts or tension with family, siblings, or friends caused you emotional distress?",hi:"क्या परिवार, भाई-बहनों या दोस्तों के साथ मतभेद या तनाव के कारण आपको भावनात्मक परेशानी हुई है?"},
+{en:"Have you experienced academic stress, such as difficulty concentrating, completing tasks, or a noticeable decline in performance?",hi:"क्या आपको पढ़ाई का तनाव हुआ है, जैसे ध्यान लगाने, कार्य पूरा करने में कठिनाई या प्रदर्शन में स्पष्ट गिरावट?"},
+{en:"Have you found it difficult to understand situations or make appropriate decisions in daily life?",hi:"क्या आपको परिस्थितियों को समझने या दैनिक जीवन में उचित निर्णय लेने में कठिनाई हुई है?"},
+{en:"Have you found it difficult to handle academic pressure, family expectations, relationship demands, or work demands?",hi:"क्या आपको पढ़ाई का दबाव, परिवार की अपेक्षाएँ, रिश्तों की माँगें या काम का दबाव संभालने में कठिनाई हुई है?"},
+{en:"Have you felt excessive or persistent worry or fear about the future that affects daily life?",hi:"क्या भविष्य को लेकर अत्यधिक या लगातार चिंता या डर ने आपके दैनिक जीवन को प्रभावित किया है?"},
+{en:"Have disturbing thoughts kept repeating and been difficult to move away from despite your efforts?",hi:"क्या परेशान करने वाले विचार बार-बार आते रहे हैं और कोशिश के बाद भी उनसे ध्यान हटाना कठिन रहा है?"},
+{en:"Have you felt persistently sad, irritable, emotionally numb or sensitive, or had anger outbursts over small things?",hi:"क्या आप लगातार उदास, चिड़चिड़े, भावनात्मक रूप से सुन्न या अधिक संवेदनशील रहे हैं, या छोटी बातों पर गुस्सा फूटा है?"},
+{en:"Have you experienced emotional, verbal, physical, or sexual abuse, online or offline, by someone known or unknown?",hi:"क्या आपने किसी परिचित या अपरिचित व्यक्ति द्वारा ऑनलाइन या ऑफलाइन भावनात्मक, मौखिक, शारीरिक या यौन दुर्व्यवहार का अनुभव किया है?"},
+{en:"Has a personal relationship caused emotional distress that affects your daily life?",hi:"क्या किसी व्यक्तिगत रिश्ते के कारण हुई भावनात्मक परेशानी ने आपके दैनिक जीवन को प्रभावित किया है?"},
+{en:"Have you used alcohol, cigarettes, or other substances to cope with stress, emotional problems, or sleep difficulties?",hi:"क्या आपने तनाव, भावनात्मक परेशानी या नींद की समस्या से निपटने के लिए शराब, सिगरेट या अन्य पदार्थों का उपयोग किया है?"},
+{en:"Have you felt that life is not worth living, wished for death, deliberately harmed yourself, or thought about ending your life?",hi:"क्या आपको लगा है कि जीवन जीने योग्य नहीं है, मृत्यु की इच्छा हुई है, आपने जानबूझकर खुद को नुकसान पहुँचाया है, या जीवन समाप्त करने के विचार आए हैं?"},
+{en:"Have you had unusual experiences, such as hearing voices or seeing things while alone?",hi:"क्या आपको असामान्य अनुभव हुए हैं, जैसे अकेले होने पर आवाजें सुनना या ऐसी चीजें देखना जो अन्य लोग नहीं देखते?"},
+{en:"Have you felt that someone wants to harm you, that people are against you, or that you are being followed?",hi:"क्या आपको लगा है कि कोई आपको नुकसान पहुँचाना चाहता है, लोग आपके खिलाफ हैं, या कोई आपका पीछा कर रहा है?"},
+{en:"Have you had episodes of crying because of emotional distress or homesickness?",hi:"क्या भावनात्मक परेशानी या घर की याद के कारण आपको रोने के दौर आए हैं?"},
+{en:"Have you felt distressed because of a long-term physical, mental, or neurological illness affecting you or a family member?",hi:"क्या अपनी या परिवार के किसी सदस्य की लंबे समय की शारीरिक, मानसिक या तंत्रिका संबंधी बीमारी के कारण आपको परेशानी हुई है?"},
+{en:"Have you felt distressed while adjusting because of gender identity, sexual orientation, cultural background, or social expectations?",hi:"क्या लैंगिक पहचान, यौन अभिविन्यास, सांस्कृतिक पृष्ठभूमि या सामाजिक अपेक्षाओं के कारण तालमेल बैठाने में आपको परेशानी हुई है?"}
+]as const;
+export const assessmentCopy={en:{yes:"Yes",no:"No",question:"Question",back:"Back",continue:"Continue",finish:"View my result"},hi:{yes:"हाँ",no:"नहीं",question:"प्रश्न",back:"पीछे",continue:"आगे",finish:"परिणाम देखें"}}as const;

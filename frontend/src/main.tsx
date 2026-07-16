@@ -15,6 +15,7 @@ import "./student-portal.css";
 import "./global-nav.css";
 import "./admin-session.css";
 import "./psychologist-portal.css";
+import "./psychologist-theme.css";
 import "./home-rebuild.css";
 import "./about-rebuild.css";
 import "./vice-chancellor-message.css";
@@ -28,6 +29,9 @@ import "./registration.css";
 import "./footer-system.css";
 import "./role-session.css";
 import "./pwa.css";
+import "./assessment.css";
+import "./assessment-admin.css";
+import "./dashboard-shell.css";
 
 initializeSeo();
 if ("serviceWorker" in navigator) window.addEventListener("load", () => void navigator.serviceWorker.register("/sw.js"));

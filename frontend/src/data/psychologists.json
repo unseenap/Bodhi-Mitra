@@ -32,5 +32,8 @@
   { "id": "neelakshi", "name": "Mrs. Neelakshi Chandra", "title": "Trainee Psychologist", "category": "trainee", "image": "/images/experts/neelakshi.svg" },
   { "id": "avantika", "name": "Ms. Avantika Choudhary", "title": "Trainee Psychologist", "category": "trainee", "image": "/images/experts/avantika.svg" },
   { "id": "pinaaki", "name": "Ms. Pinaaki Mohan", "title": "Trainee Psychologist", "category": "trainee", "image": "/images/experts/pinaki.svg" },
-  { "id": "mahima", "name": "Ms. Mahima Verma", "title": "Trainee Psychologist", "category": "trainee", "image": "/images/experts/mahima.svg" }
+  { "id": "mahima", "name": "Ms. Mahima Verma", "title": "Trainee Psychologist", "category": "trainee", "image": "/images/experts/mahima.svg" },
+  { "id": "aakriti-varshney", "name": "Ms. Aakriti Varshney", "title": "Trainee Psychologist", "category": "trainee", "image": "/images/pschylogo.svg" },
+  { "id": "pragya-suryavanshi", "name": "Ms. Pragya Suryavanshi", "title": "Trainee Psychologist", "category": "trainee", "image": "/images/pschylogo.svg" },
+  { "id": "saloni", "name": "Ms. Saloni", "title": "Trainee Psychologist", "category": "trainee", "image": "/images/pschylogo.svg" }
 ]
