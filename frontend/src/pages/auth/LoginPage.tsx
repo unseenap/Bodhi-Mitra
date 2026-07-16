@@ -18,6 +18,7 @@ export function LoginPage() {
   const [role, setRole] = useState<Role>("student");
   const [otpStage, setOtpStage] = useState(false);
   const [identifier, setIdentifier] = useState("");
+  const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const { signIn } = useAuth();
@@ -31,7 +32,7 @@ export function LoginPage() {
         await api("/auth/student/request-otp", { method: "POST", body: JSON.stringify({ identifier: data.identifier }) });
         setIdentifier(String(data.identifier)); setOtpStage(true);
       } else if (role === "student") {
-        const result = await api<any>("/auth/student/verify-otp", { method: "POST", body: JSON.stringify({ identifier, otp: data.otp }) });
+        const result = await api<any>("/auth/student/verify-otp", { method: "POST", body: JSON.stringify({ identifier, otp }) });
         signIn(result.token, result.user); navigate("/student");
       } else {
         const result = await api<any>("/auth/login", { method: "POST", body: JSON.stringify({ ...data, role }) });
@@ -52,12 +53,12 @@ export function LoginPage() {
     {otpStage && <OtpVisual identifier={identifier} />}
     <form className="auth-form" onSubmit={submit}>
       {role === "student" ? otpStage
-        ? <Field className="otp-input" label="6-digit verification code" name="otp" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoComplete="one-time-code" autoFocus required />
+        ? <Field className="otp-input" label="6-digit verification code" name="verificationCode" value={otp} onChange={event => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoComplete="one-time-code" autoFocus required />
         : <Field label="Email or university roll number" name="identifier" autoComplete="username" placeholder="235UCS006 or you@gbu.ac.in" required />
         : <><Field label="Work email" name="email" type="email" autoComplete="username" placeholder="you@gbu.ac.in" required /><Field label="Password" name="password" type="password" autoComplete="current-password" placeholder="Enter your password" required /></>}
       {error && <div className="auth-error" role="alert"><span>!</span><p>{error}</p></div>}
       <Button className="auth-submit" disabled={busy}>{busy ? <><i className="auth-spinner" /> Verifying securely…</> : <>{role === "student" ? otpStage ? "Verify and enter" : "Send secure code" : "Sign in securely"}<ArrowRight weight="bold" /></>}</Button>
-      {otpStage ? <button className="auth-back" type="button" onClick={() => { setOtpStage(false); setError(""); }}><ArrowLeft /> Use a different account</button>
+      {otpStage ? <button className="auth-back" type="button" onClick={() => { setOtpStage(false); setOtp(""); setError(""); }}><ArrowLeft /> Use a different account</button>
         : role === "student" && <p className="auth-switch">New to Bodhi-Mitra? <Link to="/register">Create student account</Link></p>}
     </form>
   </AuthExperience>;

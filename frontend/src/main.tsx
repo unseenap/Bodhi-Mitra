@@ -22,6 +22,7 @@ import "./emergency-confirmation.css";
 import "./experts-directory.css";
 import "./expert-admin.css";
 import "./auth-experience.css";
+import "./registration.css";
 import "./footer-system.css";
 import "./role-session.css";
 
