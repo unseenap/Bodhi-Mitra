@@ -5,6 +5,8 @@ import "@fontsource/manrope/600.css";
 import "@fontsource/manrope/700.css";
 import "@fontsource/manrope/800.css";
 import App from "./App";
+import { initializeSeo } from "./components/seo/SeoManager";
+import { InstallAppButton } from "./components/pwa/InstallAppButton";
 import "./styles.css";
 import "./form-controls.css";
 import "./redesign.css";
@@ -25,9 +27,14 @@ import "./auth-experience.css";
 import "./registration.css";
 import "./footer-system.css";
 import "./role-session.css";
+import "./pwa.css";
+
+initializeSeo();
+if ("serviceWorker" in navigator) window.addEventListener("load", () => void navigator.serviceWorker.register("/sw.js"));
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />
+    <InstallAppButton />
   </StrictMode>,
 );

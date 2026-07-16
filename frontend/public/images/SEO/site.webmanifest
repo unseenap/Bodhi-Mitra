@@ -1,0 +1,17 @@
+{
+  "name": "Bodhi-Mitra — GBU Mental Health Support",
+  "short_name": "Bodhi-Mitra",
+  "description": "Private mental-health support for students of Gautam Buddha University.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#7C3AED",
+  "background_color": "#F5F3FF",
+  "categories": ["health", "education", "lifestyle"],
+  "icons": [
+    { "src": "/images/SEO/web-app-manifest-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/images/SEO/web-app-manifest-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

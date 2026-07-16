@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /student/
+Disallow: /psychologist/
+Disallow: /admin/
+Sitemap: https://bodhimitra.netlify.app/sitemap.xml

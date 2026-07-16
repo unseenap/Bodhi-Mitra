@@ -1,0 +1,2 @@
+.install-app{position:fixed;z-index:80;left:1rem;bottom:1rem;display:flex;align-items:center;gap:.45rem;padding:.75rem 1rem;border:1px solid rgba(255,255,255,.35);border-radius:999px;background:linear-gradient(110deg,#7c3aed,#4c1d95);color:#fff;font-weight:800;box-shadow:0 14px 35px rgba(76,29,149,.3)}.install-app:hover{transform:translateY(-2px)}
+@media(max-width:767px){.install-app{left:auto;right:1rem;bottom:5.4rem;padding:.7rem .9rem;font-size:.78rem}}
