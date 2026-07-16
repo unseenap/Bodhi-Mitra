@@ -32,6 +32,7 @@ import "./pwa.css";
 import "./assessment.css";
 import "./assessment-admin.css";
 import "./dashboard-shell.css";
+import "./mobile-navigation-fix.css";
 
 initializeSeo();
 if ("serviceWorker" in navigator) window.addEventListener("load", () => void navigator.serviceWorker.register("/sw.js"));
