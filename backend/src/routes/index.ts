@@ -1,6 +1,6 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import { me, passwordLogin, registerStudent, requestOtp, verifyOtp } from "../controllers/auth.controller.js";
+import { changePassword, me, passwordLogin, registerStudent, requestOtp, verifyOtp } from "../controllers/auth.controller.js";
 import { createPsychologist, experts, listPsychologists, metrics, psychologistQueue, sessionHistory, studentHistory, subscribePush, updatePsychologist } from "../controllers/data.controller.js";
 import { requireAuth } from "../middleware/auth.js";
 import { adminAnalytics, adminReports, adminSessions, adminStudents, resolveReport } from "../controllers/admin.controller.js";
@@ -10,12 +10,14 @@ import { adminAssessments, assessmentStatus, submitAssessment } from "../control
 
 export const api = Router();
 const otpLimit = rateLimit({ windowMs: 10 * 60 * 1000, limit: 3, standardHeaders: true, legacyHeaders: false, message: { message: "Too many code requests. Please wait before trying again" } });
+const otpVerifyLimit = rateLimit({ windowMs: 10 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false, message: { message: "Too many verification attempts. Please wait before trying again" } });
 api.get("/health", (_req, res) => res.json({ status: "ok" }));
 api.post("/auth/student/register", otpLimit, registerStudent);
 api.post("/auth/student/request-otp", otpLimit, requestOtp);
-api.post("/auth/student/verify-otp", verifyOtp);
-api.post("/auth/login", rateLimit({ windowMs: 15 * 60 * 1000, limit: 10 }), passwordLogin);
+api.post("/auth/student/verify-otp", otpVerifyLimit, verifyOtp);
+api.post("/auth/login", rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { message: "Too many failed sign-in attempts. Please wait before trying again" } }), passwordLogin);
 api.get("/auth/me", requireAuth(), me);
+api.post("/auth/change-password", requireAuth(["psychologist", "admin"]), changePassword);
 api.get("/experts", experts);
 api.get("/student/history", requireAuth(["student"]), studentHistory);
 api.get("/student/assessment", requireAuth(["student"]), assessmentStatus);

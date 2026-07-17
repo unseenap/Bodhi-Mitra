@@ -31,6 +31,7 @@ export const studentRegistrationSchema = z.object({
 export const otpRequestSchema = z.object({ identifier: z.string().trim().min(5).max(120) });
 export const otpVerifySchema = z.object({ identifier: z.string().trim().min(5), otp: z.string().regex(/^\d{6}$/) });
 export const passwordLoginSchema = z.object({ email: emailSchema, password: z.string().min(8).max(128), role: z.enum(["psychologist", "admin"]) });
+export const passwordChangeSchema = z.object({ currentPassword: z.string().min(8).max(128), newPassword: z.string().min(12).max(128) }).refine(data => data.currentPassword !== data.newPassword, { path: ["newPassword"], message: "Choose a password you have not used for this sign-in" });
 export const emergencyRequestSchema = z.object({ mode: z.enum(sessionModes) });
 export const psychologistSchema = z.object({
   name: z.string().trim().min(2).max(100), email: emailSchema,

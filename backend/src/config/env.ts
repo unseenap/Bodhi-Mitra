@@ -13,6 +13,10 @@ const schema = z.object({
   NATIONAL_HOTLINE_NUMBER: z.string().default("14416"), ADMIN_EMAIL: z.string().email().default("admin@example.edu"), ADMIN_PASSWORD: z.string().min(10).default("replace-this-password")
 });
 export const env = schema.parse(process.env);
+if (env.NODE_ENV === "production") {
+  if (env.JWT_SECRET === "development-only-secret-change-me-now") throw new Error("JWT_SECRET must be replaced in production");
+  if (env.ADMIN_PASSWORD === "replace-this-password") throw new Error("ADMIN_PASSWORD must be replaced in production");
+}
 export const hotlines = [
   { label: env.CAMPUS_HOTLINE_LABEL, number: env.CAMPUS_HOTLINE_NUMBER, available: "Campus crisis support" },
   { label: env.NATIONAL_HOTLINE_LABEL, number: env.NATIONAL_HOTLINE_NUMBER, available: "24 hours" }

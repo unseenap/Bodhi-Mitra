@@ -45,9 +45,16 @@ export function AuthExperience({ eyebrow, title, description, children, variant 
   </section>;
 }
 
-export function OtpVisual({ identifier }: { identifier: string }) {
+export function maskIdentifier(identifier: string) {
+  return identifier.includes("@")
+    ? identifier.replace(/^(.{2}).*(@.*)$/, "$1***$2")
+    : `${identifier.slice(0, 3)}***${identifier.slice(-2)}`;
+}
+
+export function OtpVisual({ identifier, conditional = false }: { identifier: string; conditional?: boolean }) {
+  const maskedIdentifier = maskIdentifier(identifier);
   return <div className="otp-visual" aria-hidden="true">
     <div className="otp-envelope"><span /><i>••••••</i></div>
-    <div><strong>Check your inbox</strong><small>We sent a secure code to {identifier}</small></div>
+    <div><strong>{conditional ? "Check for your secure code" : "Check your inbox"}</strong><small>{conditional ? `If an active account matches ${maskedIdentifier}, the code will arrive shortly.` : `We sent a secure code to ${maskedIdentifier}`}</small></div>
   </div>;
 }

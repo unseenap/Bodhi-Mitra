@@ -12,7 +12,7 @@ import { verifyToken } from "../utils/auth.js";
 const timers = new Map<string, NodeJS.Timeout>();
 export function createSocketServer(httpServer: HttpServer) {
   const io = new Server(httpServer, { cors: { origin: env.CLIENT_URL, credentials: true } });
-  io.use((socket, next) => { try { const claims = verifyToken(socket.handshake.auth.token); socket.data.auth = { id: claims.sub, role: claims.role }; next(); } catch { next(new Error("Authentication required")); } });
+  io.use(async (socket, next) => { try { const claims = verifyToken(socket.handshake.auth.token); const user = await User.findOne({ _id: claims.sub, role: claims.role, isActive: true, verified: true }).select("role").lean(); if (!user) return next(new Error("Authentication required")); socket.data.auth = { id: claims.sub, role: user.role }; next(); } catch { next(new Error("Authentication required")); } });
   io.on("connection", async socket => {
     const { id, role } = socket.data.auth as { id: string; role: string }; socket.join(`${role}:${id}`); if (role === "psychologist") { socket.join("psychologists"); await User.findByIdAndUpdate(id, { isOnline: true }); }
     socket.on(SOCKET_EVENTS.EMERGENCY_REQUEST, async (payload, ack) => {
@@ -25,7 +25,7 @@ export function createSocketServer(httpServer: HttpServer) {
     socket.on(SOCKET_EVENTS.SESSION_JOIN, async ({ sessionId }) => { const session = await Session.findOne({ sessionId }).select("+studentId"); if (session && (String(session.studentId) === id || String(session.psychologistId) === id)) socket.join(`session:${sessionId}`); });
     socket.on(SOCKET_EVENTS.SESSION_MESSAGE, async payload => { const session = await Session.findOne({ sessionId: payload.sessionId }).select("+studentId"); if (session && (String(session.studentId) === id || String(session.psychologistId) === id)) socket.to(`session:${payload.sessionId}`).emit(SOCKET_EVENTS.SESSION_MESSAGE, { id: randomUUID(), body: String(payload.body).slice(0, 4000), sentAt: new Date().toISOString(), sender: role }); });
     socket.on(SOCKET_EVENTS.SESSION_SIGNAL, async payload => { const session = await Session.findOne({ sessionId: payload.sessionId }).select("+studentId"); if (session && (String(session.studentId) === id || String(session.psychologistId) === id)) socket.to(`session:${payload.sessionId}`).emit(SOCKET_EVENTS.SESSION_SIGNAL, { signal: payload.signal, sender: role }); });
-    socket.on(SOCKET_EVENTS.SESSION_END, async ({ sessionId }) => { const session = await Session.findOneAndUpdate({ sessionId, endedAt: null }, { endedAt: new Date() }); if (session) { await EmergencyRequest.findByIdAndUpdate(session.requestId, { status: "ended" }); io.to(`session:${sessionId}`).emit(SOCKET_EVENTS.SESSION_END, { sessionId }); } });
+    socket.on(SOCKET_EVENTS.SESSION_END, async ({ sessionId }) => { const candidate = await Session.findOne({ sessionId, endedAt: null }).select("+studentId"); if (!candidate || (String(candidate.studentId) !== id && String(candidate.psychologistId) !== id)) return; const session = await Session.findOneAndUpdate({ _id: candidate._id, endedAt: null }, { endedAt: new Date() }); if (session) { await EmergencyRequest.findByIdAndUpdate(session.requestId, { status: "ended" }); io.to(`session:${sessionId}`).emit(SOCKET_EVENTS.SESSION_END, { sessionId }); } });
     socket.on("disconnect", async () => { if (role === "psychologist") await User.findByIdAndUpdate(id, { isOnline: false }); });
   });
   return io;

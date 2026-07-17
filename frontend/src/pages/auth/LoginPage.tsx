@@ -6,6 +6,7 @@ import { AuthExperience, OtpVisual } from "../../components/auth/AuthExperience"
 import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
 import { useAuth } from "../../context/AuthContext";
+import { useOtpCooldown } from "../../hooks/useOtpCooldown";
 import { api } from "../../lib/api";
 
 const roles: { value: Role; label: string; note: string; icon: typeof UserCircle }[] = [
@@ -21,24 +22,39 @@ export function LoginPage() {
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const cooldown = useOtpCooldown();
   const { signIn } = useAuth();
   const navigate = useNavigate();
 
   async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setBusy(true); setError("");
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true); setError("");
     const data = Object.fromEntries(new FormData(event.currentTarget));
     try {
       if (role === "student" && !otpStage) {
-        await api("/auth/student/request-otp", { method: "POST", body: JSON.stringify({ identifier: data.identifier }) });
-        setIdentifier(String(data.identifier)); setOtpStage(true);
+        const normalized = String(data.identifier).trim();
+        await api("/auth/student/request-otp", { method: "POST", body: JSON.stringify({ identifier: normalized }) });
+        setIdentifier(normalized); setOtpStage(true); cooldown.start();
       } else if (role === "student") {
         const result = await api<any>("/auth/student/verify-otp", { method: "POST", body: JSON.stringify({ identifier, otp }) });
         signIn(result.token, result.user); navigate("/student");
       } else {
         const result = await api<any>("/auth/login", { method: "POST", body: JSON.stringify({ ...data, role }) });
-        signIn(result.token, result.user); navigate(`/${role}`);
+        signIn(result.token, result.user); navigate(result.user.mustChangePassword ? "/change-password" : `/${role}`);
       }
-    } catch (cause) { setError((cause as Error).message); } finally { setBusy(false); }
+    } catch (cause) { setError((cause as Error).message); }
+    finally { setBusy(false); }
+  }
+
+  async function resendCode() {
+    if (!cooldown.ready || busy) return;
+    setBusy(true); setError("");
+    try {
+      await api("/auth/student/request-otp", { method: "POST", body: JSON.stringify({ identifier }) });
+      cooldown.start(); setOtp("");
+    } catch (cause) { setError((cause as Error).message); }
+    finally { setBusy(false); }
   }
 
   const title = otpStage ? "Enter your secure code" : "Welcome back";
@@ -50,14 +66,15 @@ export function LoginPage() {
         <Icon weight={role === value ? "fill" : "duotone"} /><span><strong>{label}</strong><small>{note}</small></span>
       </button>)}
     </div>}
-    {otpStage && <OtpVisual identifier={identifier} />}
+    {otpStage && <OtpVisual identifier={identifier} conditional />}
     <form className="auth-form" onSubmit={submit}>
       {role === "student" ? otpStage
         ? <Field className="otp-input" label="6-digit verification code" name="verificationCode" value={otp} onChange={event => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoComplete="one-time-code" autoFocus required />
         : <Field label="Email or university roll number" name="identifier" autoComplete="username" placeholder="235UCS006 or you@gbu.ac.in" required />
         : <><Field label="Work email" name="email" type="email" autoComplete="username" placeholder="you@gbu.ac.in" required /><Field label="Password" name="password" type="password" autoComplete="current-password" placeholder="Enter your password" required /></>}
       {error && <div className="auth-error" role="alert"><span>!</span><p>{error}</p></div>}
-      <Button className="auth-submit" disabled={busy}>{busy ? <><i className="auth-spinner" /> Verifying securely…</> : <>{role === "student" ? otpStage ? "Verify and enter" : "Send secure code" : "Sign in securely"}<ArrowRight weight="bold" /></>}</Button>
+      <Button className="auth-submit" disabled={busy || (otpStage && otp.length !== 6)}>{busy ? <><i className="auth-spinner" /> Verifying securely...</> : <>{role === "student" ? otpStage ? "Verify and enter" : "Send secure code" : "Sign in securely"}<ArrowRight weight="bold" /></>}</Button>
+      {otpStage && <button className="auth-resend" type="button" disabled={!cooldown.ready || busy} onClick={() => void resendCode()}>{cooldown.ready ? "Send a new code" : `Send a new code in ${cooldown.seconds}s`}</button>}
       {otpStage ? <button className="auth-back" type="button" onClick={() => { setOtpStage(false); setOtp(""); setError(""); }}><ArrowLeft /> Use a different account</button>
         : role === "student" && <p className="auth-switch">New to Bodhi-Mitra? <Link to="/register">Create student account</Link></p>}
     </form>

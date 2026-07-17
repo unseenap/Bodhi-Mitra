@@ -8,6 +8,7 @@ const pendingStudentRegistrationSchema = new Schema({
   department: { type: String, required: true },
   otpHash: { type: String, required: true, select: false },
   otpExpiresAt: { type: Date, required: true, select: false },
+  otpAttempts: { type: Number, default: 0, min: 0, select: false },
   expiresAt: { type: Date, required: true, index: { expires: 0 } }
 }, { timestamps: true });
 

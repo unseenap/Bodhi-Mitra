@@ -50,14 +50,18 @@ const protections = [
   "You stay in control and can end a session at any time.",
 ];
 
+// This module is evaluated again after a real browser reload, but remains loaded
+// while the user navigates between routes in the single-page application.
+let homeIntroShownForDocument = false;
+
 export function HomePage() {
-  const [loading, setLoading] = useState(() => !sessionStorage.getItem("bodhi_intro"));
+  const [loading, setLoading] = useState(() => !homeIntroShownForDocument);
   const [tagline, setTagline] = useState(0);
 
   useEffect(() => {
     if (!loading) return;
+    homeIntroShownForDocument = true;
     const timer = window.setTimeout(() => {
-      sessionStorage.setItem("bodhi_intro", "seen");
       setLoading(false);
     }, 1700);
     return () => window.clearTimeout(timer);

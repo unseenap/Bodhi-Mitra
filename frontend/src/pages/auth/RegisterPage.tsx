@@ -2,12 +2,13 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowLeft, ArrowRight, Check, EnvelopeSimple, LockKey, PencilSimple } from "@phosphor-icons/react";
 import { Link, useNavigate } from "react-router-dom";
 import { departments } from "@bodhi/shared";
-import { AuthExperience, OtpVisual } from "../../components/auth/AuthExperience";
+import { AuthExperience, maskIdentifier, OtpVisual } from "../../components/auth/AuthExperience";
 import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
 import { SelectField } from "../../components/ui/SelectField";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../lib/api";
+import { useOtpCooldown } from "../../hooks/useOtpCooldown";
 
 type RegistrationDetails = { fullName: string; rollNumber: string; department: string; email: string; mobileNumber: string };
 const initialDetails: RegistrationDetails = { fullName: "", rollNumber: "", department: "", email: "", mobileNumber: "" };
@@ -19,6 +20,7 @@ export function RegisterPage() {
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const cooldown = useOtpCooldown();
   const requestTimer = useRef<number | null>(null);
   const requestInFlight = useRef(false);
   const { signIn } = useAuth();
@@ -49,7 +51,7 @@ export function RegisterPage() {
     requestInFlight.current = true;
     try {
       const result = await api<{ identifier: string }>("/auth/student/register", { method: "POST", body: JSON.stringify({ ...details, rollNumber: details.rollNumber.toUpperCase(), email: details.email.trim().toLowerCase(), mobileNumber: `+91${details.mobileNumber}` }) });
-      setIdentifier(result.identifier); setStage("otp");
+      setIdentifier(result.identifier); setStage("otp"); cooldown.start();
     } catch (cause) { setError((cause as Error).message); }
     finally { requestInFlight.current = false; setBusy(false); }
   }
@@ -65,9 +67,19 @@ export function RegisterPage() {
 
   function editDetails() { setStage("details"); setIdentifier(""); setOtp(""); setError(""); }
 
+  async function resendCode() {
+    if (!cooldown.ready || busy || requestInFlight.current) return;
+    requestInFlight.current = true; setBusy(true); setError("");
+    try {
+      await api("/auth/student/register", { method: "POST", body: JSON.stringify({ ...details, rollNumber: details.rollNumber.toUpperCase(), email: details.email.trim().toLowerCase(), mobileNumber: `+91${details.mobileNumber}` }) });
+      cooldown.start(); setOtp("");
+    } catch (cause) { setError((cause as Error).message); }
+    finally { requestInFlight.current = false; setBusy(false); }
+  }
+
   return <AuthExperience variant="register" eyebrow={stage === "details" ? "Student registration" : "Final verification"} title={stage === "details" ? "Create your private support account" : "One last secure step"} description={stage === "details" ? "Your account is created only after your email code is verified." : "Enter the code from your inbox to activate your account."}>
     <div className="auth-progress" aria-label={`Registration step ${stage === "details" ? 1 : 2} of 2`}><span className="active"><i>{stage === "otp" ? <Check /> : "1"}</i><b>Account details</b></span><hr /><span className={stage === "otp" ? "active" : ""}><i>2</i><b>Email verification</b></span></div>
-    {stage === "otp" && <><OtpVisual identifier={identifier} /><div className="otp-destination"><EnvelopeSimple weight="duotone" /><div><small>Verification code sent to</small><strong>{identifier}</strong></div><button type="button" onClick={editDetails}><PencilSimple /> Change</button></div></>}
+    {stage === "otp" && <><OtpVisual identifier={identifier} /><div className="otp-destination"><EnvelopeSimple weight="duotone" /><div><small>Verification code sent to</small><strong>{maskIdentifier(identifier)}</strong></div><button type="button" onClick={editDetails}><PencilSimple /> Change</button></div></>}
     <form className={`auth-form ${stage === "details" ? "auth-form--registration" : ""}`} onSubmit={submit}>
       {stage === "details" ? <div className="auth-fields-grid">
         <Field label="Full name" name="fullName" value={details.fullName} onChange={event => update("fullName", event.target.value)} autoComplete="name" placeholder="Your full name" required />
@@ -77,7 +89,8 @@ export function RegisterPage() {
         <Field label="Mobile number" name="mobileNumber" value={details.mobileNumber} onChange={event => update("mobileNumber", event.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" pattern="[6-9][0-9]{9}" maxLength={10} placeholder="10-digit number" hint="Used only for account support" required />
       </div> : <Field className="otp-input" label="6-digit verification code" name="verificationCode" value={otp} onChange={event => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoComplete="one-time-code" autoFocus required />}
       {error && <div className="auth-error" role="alert"><span>!</span><p>{error}</p></div>}
-      <Button className="auth-submit" disabled={busy}>{busy ? <><i className="auth-spinner" /> Please wait…</> : <>{stage === "details" ? "Send verification code" : "Verify and create account"}<ArrowRight weight="bold" /></>}</Button>
+      <Button className="auth-submit" disabled={busy || (stage === "otp" && otp.length !== 6)}>{busy ? <><i className="auth-spinner" /> Please wait...</> : <>{stage === "details" ? "Send verification code" : "Verify and create account"}<ArrowRight weight="bold" /></>}</Button>
+      {stage === "otp" && <button className="auth-resend" type="button" disabled={!cooldown.ready || busy} onClick={() => void resendCode()}>{cooldown.ready ? "Send a new code" : `Send a new code in ${cooldown.seconds}s`}</button>}
       {stage === "otp" ? <button className="auth-back" type="button" onClick={editDetails}><ArrowLeft /> Correct my details</button> : <p className="auth-switch"><LockKey /> Already registered? <Link to="/login">Sign in</Link></p>}
     </form>
   </AuthExperience>;
