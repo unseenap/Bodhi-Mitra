@@ -68,7 +68,7 @@ function Queue({ compact = false }: { compact?: boolean }) {
             <div className="queue-mode"><Icon weight="duotone" /></div>
             <div className="queue-person">
               <strong>{row.anonId}</strong>
-              <span>{row.mode} support</span>
+              <span>{row.mode} support{row.mood ? ` · ${row.mood}` : ""}{row.urgent ? " · Urgent" : ""}</span>
               <small><Clock /> Waiting {Math.floor(wait / 60)}m {wait % 60}s</small>
             </div>
             <Button disabled={accepting === row.requestId} onClick={() => accept(row.requestId)}>

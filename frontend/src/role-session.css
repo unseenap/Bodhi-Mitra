@@ -13,6 +13,11 @@
 .session-recovery h1{margin:.65rem 0 1rem;font-size:clamp(2rem,5vw,3.2rem)}
 .session-recovery p{color:#6b5b95;line-height:1.7}.session-recovery small{display:block;padding:.75rem;border-radius:10px;background:#fff1f2;color:#9f1239;overflow-wrap:anywhere}
 .session-recovery nav{display:flex;gap:.7rem;margin-top:1.25rem;flex-wrap:wrap}.session-recovery button,.session-recovery a{padding:.75rem 1rem;border:1px solid #7c3aed;border-radius:10px;font-weight:800}.session-recovery button{background:#7c3aed;color:#fff}.session-recovery a{color:#6d28d9}
+.session-recovery__pulse{height:5px!important;width:100%!important;margin-top:1.4rem;padding:0!important;border:0!important;border-radius:999px!important;background:linear-gradient(90deg,#7c3aed 0 34%,#ddd6fe 34%)!important;box-shadow:none!important;animation:sessionSecureLoad 1.2s ease-in-out infinite alternate}
+.role-call__status{position:absolute;z-index:3;left:50%;top:1rem;display:flex;align-items:center;gap:.4rem;transform:translateX(-50%);padding:.45rem .65rem;border-radius:9px;background:rgba(15,11,37,.72);color:#fff;font-size:.65rem;font-weight:800;backdrop-filter:blur(10px)}
+.role-call__status i{width:7px;height:7px;border-radius:50%;background:#fbbf24}.role-call__status--connected i{background:#4ade80}.role-call__status--failed i{background:#f87171}
+.role-call__error span{display:grid;gap:.35rem}.role-call__error a{color:#991b1b;font-weight:800;text-decoration:underline}
+@keyframes sessionSecureLoad{to{background:linear-gradient(90deg,#ddd6fe 0 66%,#7c3aed 66%)}}
 .dashboard-session-shell .role-session{width:100%;height:100dvh;min-height:0;overflow:hidden}
 .dashboard-session-shell .student-session-layout{min-height:0;flex:1;margin:0 auto;overflow:hidden}
 .dashboard-session-shell .clinician-layout{min-height:0;overflow:hidden}
@@ -44,3 +49,4 @@
   .dashboard-session-shell .clinician-context{display:none}
   .dashboard-session-shell .role-call{min-height:0;height:100%}
 }
+@media(prefers-reduced-motion:reduce){.session-recovery__pulse{animation:none}}

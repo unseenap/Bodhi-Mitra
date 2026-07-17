@@ -1,0 +1,22 @@
+.crisis-offline {
+  max-width: 760px;
+  margin: 0 auto 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .9rem 1rem;
+  border: 1px solid #fca5a5;
+  border-radius: 14px;
+  background: #fff;
+  color: #991b1b;
+}
+
+.crisis-offline > svg { flex: none; font-size: 1.35rem; }
+.crisis-offline span,
+.crisis-offline strong { display: block; }
+.crisis-offline span { font-size: .82rem; line-height: 1.5; }
+.crisis-offline a { color: #991b1b; font-weight: 900; text-decoration: underline; }
+
+@media (max-width: 520px) {
+  .crisis-offline { align-items: flex-start; }
+}

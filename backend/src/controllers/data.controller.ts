@@ -8,7 +8,30 @@ import { User } from "../models/User.js";
 import { saveSubscription } from "../services/push.service.js";
 
 export async function studentHistory(req: Request, res: Response) { const rows = await EmergencyRequest.find({ studentId: req.auth!.id }).select("status mode createdAt matchedAt").sort({ createdAt: -1 }).limit(50); res.json({ requests: rows }); }
-export async function psychologistQueue(_req: Request, res: Response) { const rows = await EmergencyRequest.find({ status: "pending", timeoutAt: { $gt: new Date() } }).select("anonId mode createdAt").sort({ createdAt: 1 }); res.json({ requests: rows.map(r => ({ requestId: r.id, anonId: r.anonId, mode: r.mode, waitStartedAt: r.createdAt })) }); }
+export async function activeStudentEmergency(req: Request, res: Response) {
+  const request = await EmergencyRequest.findOne({
+    studentId: req.auth!.id,
+    status: { $in: ["pending", "matched"] }
+  }).select("+studentId anonId mode mood urgent status createdAt timeoutAt").lean();
+  if (!request) return res.json({ active: null });
+  const session = request.status === "matched"
+    ? await Session.findOne({ requestId: request._id, endedAt: { $exists: false } }).select("sessionId mode").lean()
+    : null;
+  res.json({
+    active: {
+      requestId: String(request._id),
+      anonId: request.anonId,
+      mode: request.mode,
+      mood: request.mood,
+      urgent: request.urgent,
+      status: request.status,
+      waitStartedAt: request.createdAt.toISOString(),
+      timeoutAt: request.timeoutAt.toISOString(),
+      session: session ? { sessionId: session.sessionId, mode: session.mode, mood: request.mood, urgent: request.urgent, peerLabel: "Bodhi-Mitra psychologist" } : null
+    }
+  });
+}
+export async function psychologistQueue(_req: Request, res: Response) { const rows = await EmergencyRequest.find({ status: "pending", timeoutAt: { $gt: new Date() } }).select("anonId mode mood urgent createdAt").sort({ urgent: -1, createdAt: 1 }); res.json({ requests: rows.map(r => ({ requestId: r.id, anonId: r.anonId, mode: r.mode, mood: r.mood, urgent: r.urgent, waitStartedAt: r.createdAt })) }); }
 export async function sessionHistory(req: Request, res: Response) { const rows = await Session.find({ psychologistId: req.auth!.id }).select("sessionId mode startedAt endedAt").sort({ startedAt: -1 }).limit(50); res.json({ sessions: rows }); }
 export async function experts(_req: Request, res: Response) { const rows = await User.find({ role: "psychologist", verified: true, isActive: true }).select("fullName professionalTitle specializations expertCategory portraitUrl").sort({ expertCategory: 1, fullName: 1 }); res.json({ experts: rows }); }
 export async function listPsychologists(_req: Request, res: Response) { const rows = await User.find({ role: "psychologist" }).select("fullName email professionalTitle specializations expertCategory portraitUrl verified isActive isOnline mustChangePassword"); res.json({ psychologists: rows }); }

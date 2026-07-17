@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { SOCKET_EVENTS, type Hotline, type PendingEmergency, type SessionMatch, type SessionMode } from "@bodhi/shared";
 import { useAuth } from "../../context/AuthContext";
+import { api } from "../../lib/api";
 import { getSocket } from "../../lib/socket";
 
 const choices = [
@@ -35,14 +36,43 @@ export function EmergencyFlow() {
   const [request, setRequest] = useState<PendingEmergency | null>(null);
   const [hotlines, setHotlines] = useState<Hotline[]>([]);
   const [error, setError] = useState("");
+  const [online, setOnline] = useState(navigator.onLine);
   const started = useRef(Date.now());
   const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const connected = () => setOnline(true);
+    const disconnected = () => setOnline(false);
+    window.addEventListener("online", connected);
+    window.addEventListener("offline", disconnected);
+    return () => { window.removeEventListener("online", connected); window.removeEventListener("offline", disconnected); };
+  }, []);
 
   useEffect(() => {
     if (state !== "waiting") return;
     const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - started.current) / 1000)), 1000);
     return () => window.clearInterval(timer);
   }, [state]);
+
+  useEffect(() => {
+    if (!user || user.role !== "student") return;
+    let active = true;
+    api<{ active: (PendingEmergency & { status: "pending" | "matched"; session?: SessionMatch | null }) | null }>("/student/emergency/active")
+      .then(result => {
+        if (!active || !result.active) return;
+        if (result.active.status === "matched" && result.active.session) {
+          navigate(`/student/session/${result.active.session.sessionId}`, { state: result.active.session, replace: true });
+          return;
+        }
+        setMode(result.active.mode);
+        setRequest(result.active);
+        started.current = new Date(result.active.waitStartedAt).getTime();
+        setElapsed(Math.max(0, Math.floor((Date.now() - started.current) / 1000)));
+        setState("waiting");
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [user, navigate]);
 
   useEffect(() => {
     if (!user || user.role !== "student") return;
@@ -63,10 +93,16 @@ export function EmergencyFlow() {
     socket.on(SOCKET_EVENTS.EMERGENCY_QUEUED, queued);
     socket.on(SOCKET_EVENTS.SESSION_MATCHED, matched);
     socket.on(SOCKET_EVENTS.EMERGENCY_TIMEOUT, timeout);
+    const connectionFailed = () => { setSending(false); setOnline(false); setError("The secure connection is unavailable. You can call a crisis number below immediately."); };
+    const reconnected = () => { setOnline(true); setError(""); };
+    socket.on("connect_error", connectionFailed);
+    socket.on("connect", reconnected);
     return () => {
       socket.off(SOCKET_EVENTS.EMERGENCY_QUEUED, queued);
       socket.off(SOCKET_EVENTS.SESSION_MATCHED, matched);
       socket.off(SOCKET_EVENTS.EMERGENCY_TIMEOUT, timeout);
+      socket.off("connect_error", connectionFailed);
+      socket.off("connect", reconnected);
     };
   }, [user, navigate]);
 
@@ -74,21 +110,27 @@ export function EmergencyFlow() {
     setConfirming(false);
     setSending(true);
     setError("");
-    getSocket().emit(SOCKET_EVENTS.EMERGENCY_REQUEST, { mode }, (result: { ok: boolean; message?: string }) => {
-      if (!result.ok) {
+    getSocket().timeout(10_000).emit(SOCKET_EVENTS.EMERGENCY_REQUEST, { mode }, (timeoutError: Error | null, result?: { ok: boolean; message?: string }) => {
+      if (timeoutError || !result?.ok) {
         setSending(false);
-        setError(result.message ?? "We could not send the request. Please call a hotline below.");
+        setError(result?.message ?? "We could not confirm the request. Please check your connection or call a hotline below.");
       }
     });
   }
 
   function cancel() {
-    if (request) getSocket().emit(SOCKET_EVENTS.EMERGENCY_CANCEL, { requestId: request.requestId });
-    setState("ready");
-    setRequest(null);
+    if (!request) return;
+    getSocket().timeout(8_000).emit(SOCKET_EVENTS.EMERGENCY_CANCEL, { requestId: request.requestId }, (timeoutError: Error | null, result?: { ok: boolean; message?: string }) => {
+      if (timeoutError || !result?.ok) {
+        setError(result?.message ?? "Cancellation could not be confirmed. Please retry.");
+        return;
+      }
+      setState("ready");
+      setRequest(null);
+    });
   }
 
-  const pageHeader = <header className="crisis-head"><span><Warning weight="fill" /></span><h1>Emergency Mental Health Support</h1><p>You are not alone. Help is available right now.</p></header>;
+  const pageHeader = <>{!online && <div className="crisis-offline" role="alert"><Warning weight="fill" /><span><strong>You appear to be offline</strong>Online matching is paused. Call <a href="tel:112">112</a> if you are in immediate danger.</span></div>}<header className="crisis-head"><span><Warning weight="fill" /></span><h1>Emergency Mental Health Support</h1><p>You are not alone. Help is available right now.</p></header></>;
 
   if (loading) return <main className="crisis-page"><div className="crisis-skeleton" aria-label="Loading emergency support"><span /><span /><span /></div></main>;
 
@@ -96,7 +138,7 @@ export function EmergencyFlow() {
 
   if (user.role !== "student") return <main className="crisis-page">{pageHeader}<section className="crisis-gate"><span><ShieldCheck weight="duotone" /></span><h2>Student access only</h2><p>This request pathway is available only to student accounts. You can still use the emergency numbers below.</p><Link className="crisis-button crisis-button--primary" to={`/${user.role}`}>Go to dashboard <ArrowRight /></Link><HotlineStrip /></section></main>;
 
-  if (state === "waiting") return <main className="crisis-page">{pageHeader}<section className="crisis-waiting"><div className="crisis-waiting__visual"><span className="crisis-radar"><CheckCircle weight="fill" /></span><img src="/images/pschylogo.svg" alt="Bodhi-Mitra support" /></div><p className="crisis-kicker">Request sent successfully</p><h2>We are alerting available psychologists</h2><p>Keep this page open. You will enter the private session automatically when a psychologist accepts.</p><strong className="crisis-timer" aria-label={`${elapsed} seconds waiting`}>{Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}</strong><div className="crisis-waiting__facts"><span><LockKey /> Your identity remains shielded</span><span><ChatCircleDots /> Selected mode: {mode}</span></div><div className="crisis-waiting__actions"><Link className="crisis-button crisis-button--primary" to="/student">Go to my dashboard</Link><button className="crisis-button crisis-button--quiet" onClick={cancel}><X /> Cancel request</button></div><HotlineStrip /></section></main>;
+  if (state === "waiting") return <main className="crisis-page">{pageHeader}<section className="crisis-waiting"><div className="crisis-waiting__visual"><span className="crisis-radar"><CheckCircle weight="fill" /></span><img src="/images/pschylogo.svg" alt="Bodhi-Mitra support" /></div><p className="crisis-kicker">Request sent successfully</p><h2>We are alerting available psychologists</h2><p>Keep this page open. You will enter the private session automatically when a psychologist accepts.</p><strong className="crisis-timer" aria-label={`${elapsed} seconds waiting`}>{Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}</strong><div className="crisis-waiting__facts"><span><LockKey /> Your identity remains shielded</span><span><ChatCircleDots /> Selected mode: {mode}</span></div>{error && <div className="crisis-error" role="alert"><Warning weight="fill" />{error}</div>}<div className="crisis-waiting__actions"><Link className="crisis-button crisis-button--primary" to="/student">Go to my dashboard</Link><button className="crisis-button crisis-button--quiet" onClick={cancel}><X /> Cancel request</button></div><HotlineStrip /></section></main>;
 
   if (state === "timeout") return <main className="crisis-page">{pageHeader}<section className="crisis-timeout"><span><Phone weight="fill" /></span><h2>Please call for support now</h2><p>No psychologist accepted in time. These services can connect you directly.</p><div className="crisis-hotline-list">{hotlines.map(hotline => <a key={hotline.label} href={`tel:${hotline.number.replace(/\s/g, "")}`}><Phone weight="fill" /><span><strong>{hotline.label}</strong><small>{hotline.available}</small></span><b>{hotline.number}</b></a>)}</div><button className="crisis-button crisis-button--outline" onClick={() => setState("ready")}>Try Bodhi-Mitra again</button></section></main>;
 
