@@ -9,6 +9,7 @@ const userSchema = new Schema({
   professionalTitle: { type: String, trim: true }, specializations: [{ type: String, trim: true }],
   expertCategory: { type: String, enum: ["senior", "consultant", "trainee"], default: "consultant", index: true }, portraitUrl: { type: String, trim: true },
   isOnline: { type: Boolean, default: false }, isAvailable: { type: Boolean, default: true },
+  assessmentNextEligibleAt: { type: Date, select: false },
   pushSubscriptions: { type: [Schema.Types.Mixed], default: [], select: false }
 }, { timestamps: true });
 export const User = model("User", userSchema);
