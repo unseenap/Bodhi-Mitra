@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
 import { Heart, LockKey, ShieldCheck, Sparkle } from "@phosphor-icons/react";
+import { BlurFade, ShineBorder } from "../magicui/ProfileMagic";
+import { SpotlightCard } from "../reactbits/SpotlightCard";
+import { TextReveal } from "../reactbits/TextReveal";
 
 type AuthExperienceProps = {
   eyebrow: string;
@@ -18,30 +21,33 @@ export function AuthExperience({ eyebrow, title, description, children, variant 
         <img src="/images/bodhi-logo.svg" alt="" />
         <span><strong>Bodhi-Mitra</strong><small>Gautam Buddha University</small></span>
       </div>
-      <div className="auth-story__copy">
+      <BlurFade className="auth-story__copy">
         <span className="auth-kicker"><Sparkle weight="fill" /> A calmer space starts here</span>
-        <h2>Support that meets you <em>where you are.</em></h2>
+        <TextReveal as="h2" text="Support that meets you where you are." delay={.05} />
         <p>Connect with university-approved mental-health professionals in a private, compassionate environment.</p>
-      </div>
-      <div className="auth-story__visual">
-        <img src="/support-space.webp" alt="A calm, welcoming space for student wellbeing" />
-        <div className="auth-story__float"><Heart weight="fill" /><span><strong>You are not alone</strong><small>Care is only a conversation away.</small></span></div>
-      </div>
+      </BlurFade>
+      <BlurFade className="auth-story__visual" delay={.12}>
+        <SpotlightCard className="auth-story__visual-card">
+          <img src="/support-space.webp" alt="A calm, welcoming space for student wellbeing" />
+          <div className="auth-story__float"><Heart weight="fill" /><span><strong>You are not alone</strong><small>Care is only a conversation away.</small></span></div>
+        </SpotlightCard>
+      </BlurFade>
       <div className="auth-story__trust">
         <span><ShieldCheck weight="duotone" /> University verified</span>
         <span><LockKey weight="duotone" /> Privacy protected</span>
       </div>
     </aside>
-    <div className="auth-workspace">
+    <main className="auth-workspace">
+      <ShineBorder duration={16} />
       <div className="auth-mobile-brand"><img src="/images/bodhi-logo.svg" alt="" /><strong>Bodhi-Mitra</strong></div>
-      <header className="auth-workspace__header">
+      <BlurFade className="auth-workspace__header">
         <span>{eyebrow}</span>
-        <h1>{title}</h1>
+        <TextReveal as="h1" text={title} delay={.04} />
         <p>{description}</p>
-      </header>
-      {children}
+      </BlurFade>
+      <BlurFade className="auth-workspace__content" delay={.08}>{children}</BlurFade>
       <p className="auth-assurance"><LockKey weight="duotone" /> Your information is encrypted and used only to provide support.</p>
-    </div>
+    </main>
   </section>;
 }
 

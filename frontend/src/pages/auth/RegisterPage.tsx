@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, ArrowRight, Check, EnvelopeSimple, LockKey, PencilSimple } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, Check, EnvelopeSimple, LockKey, PencilSimple, ShieldCheck, UserCircle } from "@phosphor-icons/react";
 import { Link, useNavigate } from "react-router-dom";
 import { departments } from "@bodhi/shared";
 import { AuthExperience, maskIdentifier, OtpVisual } from "../../components/auth/AuthExperience";
@@ -83,14 +83,24 @@ export function RegisterPage() {
     <div className="auth-progress" aria-label={`Registration step ${stage === "details" ? 1 : 2} of 2`}><span className="active"><i>{stage === "otp" ? <Check /> : "1"}</i><b>Account details</b></span><hr /><span className={stage === "otp" ? "active" : ""}><i>2</i><b>Email verification</b></span></div>
     {stage === "otp" && <><OtpVisual identifier={identifier} /><div className="otp-destination"><EnvelopeSimple weight="duotone" /><div><small>Verification code sent to</small><strong>{maskIdentifier(identifier)}</strong></div><button type="button" onClick={editDetails}><PencilSimple /> Change</button></div></>}
     <form className={`auth-form ${stage === "details" ? "auth-form--registration" : ""}`} onSubmit={submit}>
-      {stage === "details" ? <div className="auth-fields-grid">
-        <Field label="Full name" name="fullName" value={details.fullName} onChange={event => update("fullName", event.target.value)} autoComplete="name" placeholder="Your full name" required />
-        <Field label="University roll number" name="rollNumber" value={details.rollNumber} onChange={event => update("rollNumber", event.target.value.toUpperCase())} autoCapitalize="characters" pattern="[0-9]{3}[A-Za-z]{3}[0-9]{3}" maxLength={9} placeholder="235UCS006" hint="Exactly 9 characters" required />
-        <div className="auth-field-wide"><SelectField label="School / department" name="department" value={details.department} onChange={event => update("department", event.target.value)} options={departments} required /></div>
-        <Field label="University email" name="email" type="email" value={details.email} onChange={event => update("email", event.target.value)} autoComplete="email" placeholder="you@gbu.ac.in" required />
-        <Field label="Mobile number" name="mobileNumber" value={details.mobileNumber} onChange={event => update("mobileNumber", event.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" pattern="[6-9][0-9]{9}" maxLength={10} placeholder="10-digit number" hint="Used only for account support" required />
-        <Field label="Create password" name="password" type="password" value={details.password} onChange={event => update("password", event.target.value)} autoComplete="new-password" minLength={12} maxLength={128} placeholder="At least 12 characters" hint="Use a unique password you do not use elsewhere" required />
-        <Field label="Confirm password" name="passwordConfirmation" type="password" value={passwordConfirmation} onChange={event => { setPasswordConfirmation(event.target.value); if (error) setError(""); }} autoComplete="new-password" minLength={12} maxLength={128} placeholder="Enter the same password again" required />
+      {stage === "details" ? <div className="auth-registration-sections">
+        <section className="auth-form-section">
+          <header><UserCircle weight="duotone" /><span><strong>Student details</strong><small>Your verified university identity</small></span></header>
+          <div className="auth-fields-grid">
+            <Field label="Full name" name="fullName" value={details.fullName} onChange={event => update("fullName", event.target.value)} autoComplete="name" placeholder="Your full name" required />
+            <Field label="University roll number" name="rollNumber" value={details.rollNumber} onChange={event => update("rollNumber", event.target.value.toUpperCase())} autoCapitalize="characters" pattern="[0-9]{3}[A-Za-z]{3}[0-9]{3}" maxLength={9} placeholder="235UCS006" hint="Exactly 9 characters" required />
+            <div className="auth-field-wide"><SelectField label="School / department" name="department" value={details.department} onChange={event => update("department", event.target.value)} options={departments} required /></div>
+            <Field label="University email" name="email" type="email" value={details.email} onChange={event => update("email", event.target.value)} autoComplete="email" placeholder="you@gbu.ac.in" required />
+            <Field label="Mobile number" name="mobileNumber" value={details.mobileNumber} onChange={event => update("mobileNumber", event.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" pattern="[6-9][0-9]{9}" maxLength={10} placeholder="10-digit number" hint="Used only for account support" required />
+          </div>
+        </section>
+        <section className="auth-form-section auth-form-section--security">
+          <header><ShieldCheck weight="duotone" /><span><strong>Account security</strong><small>Create a password before email verification</small></span></header>
+          <div className="auth-fields-grid">
+            <Field label="Create password" name="password" type="password" value={details.password} onChange={event => update("password", event.target.value)} autoComplete="new-password" minLength={12} maxLength={128} placeholder="At least 12 characters" hint="Use a unique password you do not use elsewhere" required />
+            <Field label="Confirm password" name="passwordConfirmation" type="password" value={passwordConfirmation} onChange={event => { setPasswordConfirmation(event.target.value); if (error) setError(""); }} autoComplete="new-password" minLength={12} maxLength={128} placeholder="Enter the same password again" required />
+          </div>
+        </section>
       </div> : <Field className="otp-input" label="6-digit verification code" name="verificationCode" value={otp} onChange={event => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoComplete="one-time-code" autoFocus required />}
       {error && <div className="auth-error" role="alert"><span>!</span><p>{error}</p></div>}
       <Button className="auth-submit" disabled={busy || (stage === "otp" && otp.length !== 6)}>{busy ? <><i className="auth-spinner" /> Please wait...</> : <>{stage === "details" ? "Send verification code" : "Verify and create account"}<ArrowRight weight="bold" /></>}</Button>

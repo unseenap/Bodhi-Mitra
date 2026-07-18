@@ -1,0 +1,37 @@
+.about-rebuild__hero-copy.magic-blur-fade { display:flex; }
+.about-rebuild__hero-image.magic-blur-fade,
+.about-hero-spotlight,
+.about-hero-spotlight .react-bits-spotlight__content { height:100%; }
+.about-hero-spotlight { border-radius:0; }
+.about-hero-spotlight img { display:block; width:100%; height:100%; object-fit:cover; }
+
+.leadership-message-reveal { height:100%; }
+.leadership-message-reveal .leadership-message { height:100%; overflow:hidden; }
+.leadership-message > :not(.magic-shine-border) { position:relative; z-index:1; }
+.leadership-message header h2 { margin:0; color:#312e81; font-size:1.3rem; }
+.leadership-message__portrait { z-index:2 !important; }
+.leadership-layout__context.magic-blur-fade { display:grid; }
+.leadership-about { position:relative; overflow:hidden; }
+.leadership-about .react-bits-spotlight__content > :not(.magic-shine-border) { position:relative; z-index:1; }
+.leadership-about .react-bits-spotlight__glow { background:radial-gradient(280px circle at var(--spotlight-x) var(--spotlight-y),rgba(196,181,253,.3),transparent 70%); }
+
+.about-standards-heading { max-width:700px; margin-bottom:3rem; }
+.about-standards-heading h2 { margin:.7rem 0; color:#312e81; font-size:clamp(2rem,4vw,3.25rem); line-height:1.08; letter-spacing:-.045em; }
+.about-standards-heading p { color:#625b87; line-height:1.65; }
+.about-standard-wrap { min-height:100%; }
+.about-standard-wrap .about-standard { height:100%; }
+.about-standard .react-bits-spotlight__content { height:100%; }
+.about-standard .react-bits-spotlight__content > svg { font-size:2.4rem; color:#7c3aed; }
+.about-standard .react-bits-spotlight__content h3 { margin:2rem 0 .5rem; }
+.about-standard .react-bits-spotlight__content p { margin:0; color:#625b87; line-height:1.65; }
+
+.about-governance-reveal { max-width:1160px; margin:6rem auto; }
+.about-governance-reveal .about-rebuild__governance { position:relative; overflow:hidden; margin:0; }
+.about-rebuild__governance > :not(.magic-shine-border) { position:relative; z-index:1; }
+
+@media(max-width:767px){
+  .leadership-message header h2 { font-size:1.08rem; }
+  .about-standard .react-bits-spotlight__content h3 { margin-top:1rem; }
+  .about-governance-reveal { margin:4rem 1rem; }
+  .about-governance-reveal .about-rebuild__governance { margin:0; }
+}
