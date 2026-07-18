@@ -5,9 +5,11 @@ import { useAuth } from "../../context/AuthContext";
 import { api } from "../../lib/api";
 import { getSocket } from "../../lib/socket";
 import { PsychologistSessionView, StudentSessionView, type SessionMessage } from "./SessionRoleViews";
+import { buildIceServers, mediaConstraints, mediaFailureMessage } from "./webrtc";
 
 type MatchContext = SessionMatch & { mood?: string; urgent?: boolean };
 type Ack = { ok: boolean; message?: string };
+type SessionSignal = { sdp?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit };
 
 export function SessionRoom() {
   const { sessionId = "" } = useParams();
@@ -30,14 +32,22 @@ export function SessionRoom() {
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
   const [mediaError, setMediaError] = useState("");
+  const [mediaRevision, setMediaRevision] = useState(0);
+  const [remotePlaybackBlocked, setRemotePlaybackBlocked] = useState(false);
+  const [remoteAudioReady, setRemoteAudioReady] = useState(false);
   const [callStatus, setCallStatus] = useState<"connecting" | "connected" | "reconnecting" | "failed">("connecting");
   const localVideo = useRef<HTMLVideoElement>(null);
   const remoteVideo = useRef<HTMLVideoElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
   const offerStarted = useRef(false);
-  const studentReadyEchoed = useRef(false);
+  const remoteReady = useRef(false);
   const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
+  const earlySignals = useRef<SessionSignal[]>([]);
+  const mediaGeneration = useRef(0);
+  const readyHandler = useRef<(() => void) | null>(null);
+  const signalHandler = useRef<((payload: { signal: SessionSignal }) => void) | null>(null);
+  const reconnectTimer = useRef<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -66,6 +76,7 @@ export function SessionRoom() {
 
   useEffect(() => {
     if (!sessionId || !match || match.ended) return;
+    let disposed = false;
     const socket = getSocket();
     const receive = (message: SessionMessage) => setMessages(current => [...current, message]);
     const sessionEnded = () => {
@@ -80,98 +91,199 @@ export function SessionRoom() {
     socket.on("connect_error", connectError);
 
     socket.timeout(8_000).emit(SOCKET_EVENTS.SESSION_JOIN, { sessionId }, async (timeoutError: Error | null, result?: Ack) => {
+      if (disposed) return;
       if (timeoutError || !result?.ok) {
         setSessionError(result?.message ?? "The session could not be joined. Please return to your dashboard and reconnect.");
         return;
       }
       setSessionError("");
-      if (match.mode !== "chat") await setupMedia(socket);
-      socket.emit(SOCKET_EVENTS.SESSION_READY, { sessionId });
+      if (match.mode !== "chat") {
+        const mediaReady = await setupMedia(socket);
+        if (!disposed && mediaReady) socket.emit(SOCKET_EVENTS.SESSION_READY, { sessionId });
+      } else socket.emit(SOCKET_EVENTS.SESSION_READY, { sessionId });
     });
 
     return () => {
+      disposed = true;
       socket.off(SOCKET_EVENTS.SESSION_MESSAGE, receive);
       socket.off(SOCKET_EVENTS.SESSION_END, sessionEnded);
-      socket.off(SOCKET_EVENTS.SESSION_SIGNAL);
-      socket.off(SOCKET_EVENTS.SESSION_READY);
       socket.off("connect_error", connectError);
-      stopMedia();
+      stopMedia(socket);
     };
-  }, [sessionId, isPsychologist, match?.mode, match?.ended]);
+  }, [sessionId, isPsychologist, match?.mode, match?.ended, mediaRevision]);
 
-  function stopMedia() {
+  useEffect(() => {
+    if (ended || match?.mode === "chat") return;
+    const protectActiveCall = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", protectActiveCall);
+    return () => window.removeEventListener("beforeunload", protectActiveCall);
+  }, [ended, match?.mode]);
+
+  function stopMedia(socket = getSocket()) {
+    mediaGeneration.current += 1;
+    if (readyHandler.current) socket.off(SOCKET_EVENTS.SESSION_READY, readyHandler.current);
+    if (signalHandler.current) socket.off(SOCKET_EVENTS.SESSION_SIGNAL, signalHandler.current);
+    readyHandler.current = null;
+    signalHandler.current = null;
+    if (reconnectTimer.current !== null) window.clearTimeout(reconnectTimer.current);
+    reconnectTimer.current = null;
     peerConnection.current?.close();
     peerConnection.current = null;
     const stream = localVideo.current?.srcObject as MediaStream | null;
     stream?.getTracks().forEach(track => track.stop());
     if (localVideo.current) localVideo.current.srcObject = null;
     if (remoteVideo.current) remoteVideo.current.srcObject = null;
+    offerStarted.current = false;
+    remoteReady.current = false;
+    pendingCandidates.current = [];
+    earlySignals.current = [];
   }
 
   async function setupMedia(socket: ReturnType<typeof getSocket>) {
+    const generation = ++mediaGeneration.current;
+    offerStarted.current = false;
+    remoteReady.current = false;
+    pendingCandidates.current = [];
+    earlySignals.current = [];
+    setMediaError("");
+    setRemotePlaybackBlocked(false);
+    setRemoteAudioReady(false);
+    setCallStatus("connecting");
+
+    const sendSignal = (signal: SessionSignal) => {
+      socket.timeout(6_000).emit(SOCKET_EVENTS.SESSION_SIGNAL, { sessionId, signal }, (timeoutError: Error | null, result?: Ack) => {
+        if (!timeoutError && result?.ok) return;
+        setCallStatus("failed");
+        setMediaError(result?.message ?? "Call signaling did not reach the server. Check your connection and retry.");
+      });
+    };
+
+    const createOffer = async (iceRestart = false) => {
+      const peer = peerConnection.current;
+      if (!isPsychologist || !peer || (offerStarted.current && !iceRestart) || peer.signalingState !== "stable") return;
+      offerStarted.current = true;
+      try {
+        const offer = await peer.createOffer({ iceRestart });
+        await peer.setLocalDescription(offer);
+        sendSignal({ sdp: { type: offer.type, sdp: offer.sdp } });
+      } catch {
+        offerStarted.current = false;
+        setCallStatus("failed");
+        setMediaError("The secure call could not be started. Check your connection and try again.");
+      }
+    };
+
+    const applySignal = async (signal: SessionSignal) => {
+      const peer = peerConnection.current;
+      if (!peer || generation !== mediaGeneration.current) return;
+      try {
+        if (signal.sdp) {
+          if (signal.sdp.type === "offer" && peer.signalingState !== "stable") {
+            await peer.setLocalDescription({ type: "rollback" });
+          }
+          await peer.setRemoteDescription(signal.sdp);
+          for (const candidate of pendingCandidates.current.splice(0)) await peer.addIceCandidate(candidate);
+          if (signal.sdp.type === "offer") {
+            const answer = await peer.createAnswer();
+            await peer.setLocalDescription(answer);
+            sendSignal({ sdp: { type: answer.type, sdp: answer.sdp } });
+          }
+        } else if (signal.candidate) {
+          if (peer.remoteDescription) await peer.addIceCandidate(signal.candidate);
+          else pendingCandidates.current.push(signal.candidate);
+        }
+      } catch {
+        setMediaError("The secure call negotiation was interrupted. Use Retry call to reconnect.");
+        setCallStatus("failed");
+      }
+    };
+
+    const receiveReady = () => {
+      remoteReady.current = true;
+      if (isPsychologist) void createOffer();
+      else socket.emit(SOCKET_EVENTS.SESSION_READY, { sessionId });
+    };
+    const receiveSignal = ({ signal }: { signal: SessionSignal }) => {
+      if (!peerConnection.current) earlySignals.current.push(signal);
+      else void applySignal(signal);
+    };
+    readyHandler.current = receiveReady;
+    signalHandler.current = receiveSignal;
+    socket.on(SOCKET_EVENTS.SESSION_READY, receiveReady);
+    socket.on(SOCKET_EVENTS.SESSION_SIGNAL, receiveSignal);
+
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("Media devices are unavailable");
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: match?.mode === "video" });
-      if (localVideo.current) localVideo.current.srcObject = stream;
-      const iceServers: RTCIceServer[] = [{ urls: import.meta.env.VITE_STUN_URL ?? "stun:stun.l.google.com:19302" }];
-      if (import.meta.env.VITE_TURN_URL) {
-        iceServers.push({
-          urls: import.meta.env.VITE_TURN_URL,
-          username: import.meta.env.VITE_TURN_USERNAME,
-          credential: import.meta.env.VITE_TURN_CREDENTIAL
-        });
+      const relayRequest = api<{ iceServers: RTCIceServer[] }>(`/sessions/${sessionId}/ice-config`).catch(() => ({ iceServers: [] }));
+      const stream = await navigator.mediaDevices.getUserMedia(mediaConstraints(match?.mode ?? "voice"));
+      if (generation !== mediaGeneration.current) {
+        stream.getTracks().forEach(track => track.stop());
+        return false;
       }
+      setMuted(false);
+      setCameraOff(false);
+      if (localVideo.current) localVideo.current.srcObject = stream;
+      const localIceServers = buildIceServers({
+        stunUrl: import.meta.env.VITE_STUN_URL,
+        turnUrl: import.meta.env.VITE_TURN_URL,
+        turnUsername: import.meta.env.VITE_TURN_USERNAME,
+        turnCredential: import.meta.env.VITE_TURN_CREDENTIAL
+      });
+      const relay = await relayRequest;
+      const iceServers = [...localIceServers, ...relay.iceServers];
       const peer = new RTCPeerConnection({ iceServers });
       peerConnection.current = peer;
       stream.getTracks().forEach(track => peer.addTrack(track, stream));
-      peer.ontrack = event => { if (remoteVideo.current) remoteVideo.current.srcObject = event.streams[0]; };
+      peer.ontrack = event => {
+        const media = remoteVideo.current;
+        if (!media) return;
+        const remoteStream = media.srcObject instanceof MediaStream ? media.srcObject : (event.streams[0] ?? new MediaStream());
+        if (!remoteStream.getTracks().some(track => track.id === event.track.id)) remoteStream.addTrack(event.track);
+        media.srcObject = remoteStream;
+        media.muted = false;
+        media.volume = 1;
+        event.track.enabled = true;
+        if (event.track.kind === "audio") setRemoteAudioReady(true);
+        const playRemote = () => void media.play().then(() => setRemotePlaybackBlocked(false)).catch(() => setRemotePlaybackBlocked(true));
+        event.track.onunmute = playRemote;
+        media.onloadedmetadata = playRemote;
+        playRemote();
+      };
       peer.onicecandidate = event => {
-        if (event.candidate) socket.emit(SOCKET_EVENTS.SESSION_SIGNAL, { sessionId, signal: { candidate: event.candidate.toJSON() } });
+        if (event.candidate && generation === mediaGeneration.current) sendSignal({ candidate: event.candidate.toJSON() });
       };
       peer.onconnectionstatechange = () => {
         const state = peer.connectionState;
         setCallStatus(state === "connected" ? "connected" : state === "failed" ? "failed" : state === "disconnected" ? "reconnecting" : "connecting");
-        if (state === "failed") setMediaError("The call connection failed. End the call and retry, or continue using emergency telephone support.");
+        if (state === "connected") {
+          setMediaError("");
+          offerStarted.current = false;
+        }
+        if (state === "disconnected" && isPsychologist) {
+          if (reconnectTimer.current !== null) window.clearTimeout(reconnectTimer.current);
+          reconnectTimer.current = window.setTimeout(() => void createOffer(true), 2500);
+        }
+        if (state === "failed") setMediaError("The call connection failed. Use Retry call, or continue with campus telephone support.");
       };
+      peer.onicecandidateerror = () => setCallStatus(current => current === "connected" ? current : "reconnecting");
 
-      const createOffer = async () => {
-        if (!isPsychologist || offerStarted.current || peer.signalingState !== "stable") return;
-        offerStarted.current = true;
-        const offer = await peer.createOffer();
-        await peer.setLocalDescription(offer);
-        socket.emit(SOCKET_EVENTS.SESSION_SIGNAL, { sessionId, signal: { sdp: { type: offer.type, sdp: offer.sdp } } });
-      };
-      const receiveReady = () => {
-        if (isPsychologist) void createOffer();
-        else if (!studentReadyEchoed.current) {
-          studentReadyEchoed.current = true;
-          socket.emit(SOCKET_EVENTS.SESSION_READY, { sessionId });
-        }
-      };
-      const receiveSignal = async ({ signal }: { signal: { sdp?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit } }) => {
-        try {
-          if (signal.sdp) {
-            await peer.setRemoteDescription(signal.sdp);
-            for (const candidate of pendingCandidates.current.splice(0)) await peer.addIceCandidate(candidate);
-            if (signal.sdp.type === "offer") {
-              const answer = await peer.createAnswer();
-              await peer.setLocalDescription(answer);
-              socket.emit(SOCKET_EVENTS.SESSION_SIGNAL, { sessionId, signal: { sdp: { type: answer.type, sdp: answer.sdp } } });
-            }
-          } else if (signal.candidate) {
-            if (peer.remoteDescription) await peer.addIceCandidate(signal.candidate);
-            else pendingCandidates.current.push(signal.candidate);
-          }
-        } catch {
-          setMediaError("The secure call negotiation was interrupted. Please check your connection and try again.");
-        }
-      };
-      socket.on(SOCKET_EVENTS.SESSION_READY, receiveReady);
-      socket.on(SOCKET_EVENTS.SESSION_SIGNAL, receiveSignal);
-    } catch {
+      for (const signal of earlySignals.current.splice(0)) await applySignal(signal);
+      if (remoteReady.current && isPsychologist) await createOffer();
+      return true;
+    } catch (error) {
       setCallStatus("failed");
-      setMediaError("Microphone or camera access was not granted. Check browser permissions, then reload this session.");
+      setMediaError(mediaFailureMessage(error));
+      return false;
     }
+  }
+
+  function retryMedia() {
+    stopMedia();
+    setMediaRevision(value => value + 1);
+  }
+
+  function resumeRemoteAudio() {
+    void remoteVideo.current?.play().then(() => setRemotePlaybackBlocked(false)).catch(() => setMediaError("Audio playback is still blocked by the browser. Check this site's sound permission."));
   }
 
   function send() {
@@ -202,6 +314,7 @@ export function SessionRoom() {
   function toggleAudio() {
     const track = (localVideo.current?.srcObject as MediaStream | null)?.getAudioTracks()[0];
     if (track) { track.enabled = muted; setMuted(!muted); }
+    else setToast("No active microphone was found. Retry the call after checking permissions.");
   }
   function toggleVideo() {
     const track = (localVideo.current?.srcObject as MediaStream | null)?.getVideoTracks()[0];
@@ -235,7 +348,8 @@ export function SessionRoom() {
     sessionId, match, messages, draft, setDraft, paused, setPaused, ended, toast, setToast,
     time: `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`,
     bottom, submit, handleKeys, endSession, saveTranscript, escalate, localVideo, remoteVideo,
-    muted, cameraOff, toggleAudio, toggleVideo, mediaError, callStatus
+    muted, cameraOff, toggleAudio, toggleVideo, mediaError, callStatus,
+    retryMedia, remotePlaybackBlocked, remoteAudioReady, resumeRemoteAudio
   };
 
   return isPsychologist

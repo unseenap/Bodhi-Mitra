@@ -4,7 +4,7 @@ import { changePassword, me, passwordLogin, registerStudent, requestOtp, request
 import { activeStudentEmergency, createPsychologist, experts, listPsychologists, metrics, psychologistQueue, sessionHistory, studentHistory, subscribePush, updatePsychologist } from "../controllers/data.controller.js";
 import { requireAuth } from "../middleware/auth.js";
 import { adminAnalytics, adminReports, adminSessions, adminStudents, resolveReport } from "../controllers/admin.controller.js";
-import { escalateSession, rateSession, sessionDetails } from "../controllers/session.controller.js";
+import { escalateSession, rateSession, sessionDetails, sessionIceConfiguration } from "../controllers/session.controller.js";
 import { psychologistProfile, psychologistSummary, setAvailability } from "../controllers/psychologist.controller.js";
 import { adminAssessments, assessmentStatus, submitAssessment } from "../controllers/assessment.controller.js";
 
@@ -43,5 +43,6 @@ api.get("/admin/assessments", requireAuth(["admin"]), adminAssessments);
 api.patch("/admin/reports/:id/resolve", requireAuth(["admin"]), resolveReport);
 const sessionActionLimit = rateLimit({ windowMs: 5 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false });
 api.get("/sessions/:sessionId", requireAuth(["student", "psychologist"]), sessionDetails);
+api.get("/sessions/:sessionId/ice-config", sessionActionLimit, requireAuth(["student", "psychologist"]), sessionIceConfiguration);
 api.post("/sessions/:sessionId/rating", sessionActionLimit, requireAuth(["student"]), rateSession);
 api.post("/sessions/:sessionId/escalate", sessionActionLimit, requireAuth(["student", "psychologist"]), escalateSession);

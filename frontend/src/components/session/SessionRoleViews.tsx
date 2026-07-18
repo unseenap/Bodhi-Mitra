@@ -1,5 +1,5 @@
 import { useState, type Dispatch, type FormEvent, type KeyboardEvent, type RefObject, type SetStateAction } from "react";
-import { ArrowLeft, ChatCircleDots, CheckCircle, DownloadSimple, Heart, Info, LockKey, Microphone, MicrophoneSlash, NotePencil, PaperPlaneTilt, Pause, PhoneDisconnect, Play, Pulse, ShieldCheck, Sparkle, Star, UserCircle, VideoCamera, VideoCameraSlash, Warning, WarningCircle, X } from "@phosphor-icons/react";
+import { ArrowClockwise, ArrowLeft, ChatCircleDots, CheckCircle, DownloadSimple, Heart, Info, LockKey, Microphone, MicrophoneSlash, NotePencil, PaperPlaneTilt, Pause, PhoneDisconnect, Play, Pulse, ShieldCheck, Sparkle, SpeakerHigh, Star, UserCircle, VideoCamera, VideoCameraSlash, Warning, WarningCircle, X } from "@phosphor-icons/react";
 import type { SessionMatch } from "@bodhi/shared";
 import { Button } from "../ui/Button";
 
@@ -12,6 +12,7 @@ type CommonProps = {
   endSession: () => void; saveTranscript: () => void; escalate: () => void; localVideo: RefObject<HTMLVideoElement | null>; remoteVideo: RefObject<HTMLVideoElement | null>;
   muted: boolean; cameraOff: boolean; toggleAudio: () => void; toggleVideo: () => void; mediaError: string;
   callStatus: "connecting" | "connected" | "reconnecting" | "failed";
+  retryMedia: () => void; remotePlaybackBlocked: boolean; remoteAudioReady: boolean; resumeRemoteAudio: () => void;
 };
 
 const studentReplies = ["I'm feeling anxious", "I need a moment", "I'm not sure how to explain", "Can we talk more?", "Thank you for listening"];
@@ -30,7 +31,25 @@ function Composer({ draft, setDraft, submit, handleKeys, replies, disabled, plac
 }
 function CallStage(props: CommonProps & { psychologist?: boolean }) {
   const statusText = { connecting: "Connecting securely", connected: "Connected", reconnecting: "Reconnecting", failed: "Connection failed" }[props.callStatus];
-  return <div className={`role-call ${props.psychologist ? "role-call--clinician" : ""}`}><video ref={props.remoteVideo} autoPlay playsInline /><video className="role-call__local" ref={props.localVideo} autoPlay playsInline muted /><div className={`role-call__status role-call__status--${props.callStatus}`} role="status"><i />{statusText}</div>{props.mediaError && <div className="role-call__error" role="alert"><WarningCircle /><span>{props.mediaError}<a href="tel:112">Call 112</a></span></div>}<div className="role-call__identity"><span>{props.psychologist ? "Student" : "Psychologist"}</span><strong>{props.match?.peerLabel ?? (props.psychologist ? "Anonymous student" : "Bodhi-Mitra professional")}</strong></div><div className="role-call__controls"><button onClick={props.toggleAudio} aria-label={props.muted ? "Unmute" : "Mute"} aria-pressed={props.muted}>{props.muted ? <MicrophoneSlash /> : <Microphone />}</button>{props.match?.mode === "video" && <button onClick={props.toggleVideo} aria-label={props.cameraOff ? "Turn camera on" : "Turn camera off"} aria-pressed={props.cameraOff}>{props.cameraOff ? <VideoCameraSlash /> : <VideoCamera />}</button>}<button className="end" onClick={props.endSession} disabled={props.ended}><PhoneDisconnect /> End</button></div></div>;
+  const isVoice = props.match?.mode === "voice";
+  const peer = props.match?.peerLabel ?? (props.psychologist ? "Anonymous student" : "Bodhi-Mitra professional");
+  return <div className={`role-call role-call--${isVoice ? "voice" : "video"} ${props.psychologist ? "role-call--clinician" : ""}`}>
+    <video className="role-call__remote" ref={props.remoteVideo} autoPlay playsInline />
+    {!isVoice && <video className={`role-call__local ${props.cameraOff ? "is-off" : ""}`} ref={props.localVideo} autoPlay playsInline muted />}
+    {isVoice && <video className="role-call__audio-source" ref={props.localVideo} autoPlay playsInline muted />}
+    <div className="role-call__topline"><div className={`role-call__status role-call__status--${props.callStatus}`} role="status" aria-live="polite"><i />{statusText}</div><span><LockKey weight="fill" /> Encrypted in transit</span></div>
+    <div className="role-call__identity"><span>{props.psychologist ? "Anonymous student" : "Verified psychologist"}</span><strong>{peer}</strong></div>
+    {isVoice && <div className="role-call__voice-focus"><div className="role-call__avatar">{peer.charAt(0).toUpperCase()}<span className={props.remoteAudioReady ? "is-ready" : ""} /></div><p>{props.callStatus === "connected" && props.remoteAudioReady ? "Voice connected · audio receiving" : statusText}</p><div className={`role-call__wave ${props.remoteAudioReady ? "is-ready" : ""}`} aria-hidden="true">{[1,2,3,4,5,6,7].map(bar => <i key={bar} />)}</div><small>{props.remoteAudioReady ? "The other participant's audio track is active" : "Waiting for the other participant's audio"}</small></div>}
+    {props.cameraOff && !isVoice && <div className="role-call__camera-off"><VideoCameraSlash /><strong>Your camera is off</strong></div>}
+    {props.mediaError && <div className="role-call__error" role="alert"><WarningCircle /><span><strong>Call needs attention</strong>{props.mediaError}<span><button onClick={props.retryMedia}><ArrowClockwise /> Retry call</button><a href="tel:+911212121212">Call campus hotline</a></span></span></div>}
+    {props.remotePlaybackBlocked && <button className="role-call__sound-prompt" onClick={props.resumeRemoteAudio}><SpeakerHigh weight="fill" /> Tap to hear the other person</button>}
+    <div className="role-call__controls" aria-label="Call controls">
+      <button className={props.muted ? "is-active" : ""} onClick={props.toggleAudio} aria-label={props.muted ? "Unmute microphone" : "Mute microphone"} aria-pressed={props.muted}>{props.muted ? <MicrophoneSlash /> : <Microphone />}<span>{props.muted ? "Unmute" : "Mute"}</span></button>
+      {props.match?.mode === "video" && <button className={props.cameraOff ? "is-active" : ""} onClick={props.toggleVideo} aria-label={props.cameraOff ? "Turn camera on" : "Turn camera off"} aria-pressed={props.cameraOff}>{props.cameraOff ? <VideoCameraSlash /> : <VideoCamera />}<span>{props.cameraOff ? "Camera on" : "Camera off"}</span></button>}
+      <button onClick={props.retryMedia} aria-label="Reconnect call"><ArrowClockwise /><span>Reconnect</span></button>
+      <button className="end" onClick={props.endSession} disabled={props.ended}><PhoneDisconnect /><span>End call</span></button>
+    </div>
+  </div>;
 }
 
 export function StudentSessionView(props: CommonProps & { ratingOpen: boolean; rating: number; setRating: Dispatch<SetStateAction<number>>; submitRating: () => void; skipRating: () => void }) {

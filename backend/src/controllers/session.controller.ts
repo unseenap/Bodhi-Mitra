@@ -1,5 +1,7 @@
 import type { Request, Response } from "express";
+import { createHmac } from "node:crypto";
 import { z } from "zod";
+import { env } from "../config/env.js";
 import { AuditLog } from "../models/AuditLog.js";
 import { EmergencyRequest } from "../models/EmergencyRequest.js";
 import { Session } from "../models/Session.js";
@@ -28,6 +30,24 @@ export async function sessionDetails(req: Request, res: Response) {
       startedAt: session.startedAt
     }
   });
+}
+
+export async function sessionIceConfiguration(req: Request, res: Response) {
+  const sessionId = z.string().uuid().parse(req.params.sessionId);
+  const session = await Session.findOne({
+    sessionId,
+    endedAt: { $exists: false },
+    $or: [{ studentId: req.auth!.id }, { psychologistId: req.auth!.id }]
+  }).select("+studentId");
+  if (!session) return res.status(404).json({ message: "Active session not found" });
+  if (!env.TURN_URL || !env.TURN_SHARED_SECRET) return res.json({ iceServers: [] });
+
+  const expiresAt = Math.floor(Date.now() / 1000) + env.TURN_TTL_SECONDS;
+  const username = `${expiresAt}:${req.auth!.id}`;
+  const credential = createHmac("sha1", env.TURN_SHARED_SECRET).update(username).digest("base64");
+  const urls = env.TURN_URL.split(",").map(value => value.trim()).filter(Boolean);
+  res.setHeader("Cache-Control", "private, no-store");
+  res.json({ iceServers: [{ urls, username, credential }], expiresAt });
 }
 
 export async function rateSession(req: Request, res: Response) {
