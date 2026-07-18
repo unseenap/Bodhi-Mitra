@@ -1,6 +1,6 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import { changePassword, me, passwordLogin, registerStudent, requestOtp, verifyOtp } from "../controllers/auth.controller.js";
+import { changePassword, me, passwordLogin, registerStudent, requestOtp, requestStudentPasswordReset, resetStudentPassword, verifyOtp } from "../controllers/auth.controller.js";
 import { activeStudentEmergency, createPsychologist, experts, listPsychologists, metrics, psychologistQueue, sessionHistory, studentHistory, subscribePush, updatePsychologist } from "../controllers/data.controller.js";
 import { requireAuth } from "../middleware/auth.js";
 import { adminAnalytics, adminReports, adminSessions, adminStudents, resolveReport } from "../controllers/admin.controller.js";
@@ -15,6 +15,8 @@ api.get("/health", (_req, res) => res.json({ status: "ok" }));
 api.post("/auth/student/register", otpLimit, registerStudent);
 api.post("/auth/student/request-otp", otpLimit, requestOtp);
 api.post("/auth/student/verify-otp", otpVerifyLimit, verifyOtp);
+api.post("/auth/student/forgot-password", otpLimit, requestStudentPasswordReset);
+api.post("/auth/student/reset-password", otpVerifyLimit, resetStudentPassword);
 api.post("/auth/login", rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { message: "Too many failed sign-in attempts. Please wait before trying again" } }), passwordLogin);
 api.get("/auth/me", requireAuth(), me);
 api.post("/auth/change-password", requireAuth(["psychologist", "admin"]), changePassword);

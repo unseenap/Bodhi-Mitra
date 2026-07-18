@@ -10,14 +10,15 @@ import { useAuth } from "../../context/AuthContext";
 import { api } from "../../lib/api";
 import { useOtpCooldown } from "../../hooks/useOtpCooldown";
 
-type RegistrationDetails = { fullName: string; rollNumber: string; department: string; email: string; mobileNumber: string };
-const initialDetails: RegistrationDetails = { fullName: "", rollNumber: "", department: "", email: "", mobileNumber: "" };
+type RegistrationDetails = { fullName: string; rollNumber: string; department: string; email: string; mobileNumber: string; password: string };
+const initialDetails: RegistrationDetails = { fullName: "", rollNumber: "", department: "", email: "", mobileNumber: "", password: "" };
 
 export function RegisterPage() {
   const [stage, setStage] = useState<"details" | "otp">("details");
   const [details, setDetails] = useState(initialDetails);
   const [identifier, setIdentifier] = useState("");
   const [otp, setOtp] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const cooldown = useOtpCooldown();
@@ -38,6 +39,7 @@ export function RegisterPage() {
     if (busy || requestInFlight.current) return;
     setError("");
     if (stage === "details") {
+      if (details.password !== passwordConfirmation) { setError("Passwords do not match"); return; }
       setBusy(true);
       if (requestTimer.current) window.clearTimeout(requestTimer.current);
       requestTimer.current = window.setTimeout(() => void beginRegistration(), 450);
@@ -87,6 +89,8 @@ export function RegisterPage() {
         <div className="auth-field-wide"><SelectField label="School / department" name="department" value={details.department} onChange={event => update("department", event.target.value)} options={departments} required /></div>
         <Field label="University email" name="email" type="email" value={details.email} onChange={event => update("email", event.target.value)} autoComplete="email" placeholder="you@gbu.ac.in" required />
         <Field label="Mobile number" name="mobileNumber" value={details.mobileNumber} onChange={event => update("mobileNumber", event.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" pattern="[6-9][0-9]{9}" maxLength={10} placeholder="10-digit number" hint="Used only for account support" required />
+        <Field label="Create password" name="password" type="password" value={details.password} onChange={event => update("password", event.target.value)} autoComplete="new-password" minLength={12} maxLength={128} placeholder="At least 12 characters" hint="Use a unique password you do not use elsewhere" required />
+        <Field label="Confirm password" name="passwordConfirmation" type="password" value={passwordConfirmation} onChange={event => { setPasswordConfirmation(event.target.value); if (error) setError(""); }} autoComplete="new-password" minLength={12} maxLength={128} placeholder="Enter the same password again" required />
       </div> : <Field className="otp-input" label="6-digit verification code" name="verificationCode" value={otp} onChange={event => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoComplete="one-time-code" autoFocus required />}
       {error && <div className="auth-error" role="alert"><span>!</span><p>{error}</p></div>}
       <Button className="auth-submit" disabled={busy || (stage === "otp" && otp.length !== 6)}>{busy ? <><i className="auth-spinner" /> Please wait...</> : <>{stage === "details" ? "Send verification code" : "Verify and create account"}<ArrowRight weight="bold" /></>}</Button>

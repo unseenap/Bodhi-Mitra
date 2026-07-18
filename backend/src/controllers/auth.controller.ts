@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import bcrypt from "bcryptjs";
-import { otpRequestSchema, otpVerifySchema, passwordChangeSchema, passwordLoginSchema, studentRegistrationSchema } from "@bodhi/shared";
+import { otpRequestSchema, otpVerifySchema, passwordChangeSchema, passwordLoginSchema, passwordResetSchema, studentRegistrationSchema } from "@bodhi/shared";
 import { env } from "../config/env.js";
 import { User } from "../models/User.js";
 import { PendingStudentRegistration } from "../models/PendingStudentRegistration.js";
@@ -27,7 +27,8 @@ export async function registerStudent(req: Request, res: Response) {
   await PendingStudentRegistration.deleteMany({ $or: [{ email: data.email }, { rollNumber: data.rollNumber }] });
   const otp = makeOtp();
   const otpExpiresAt = new Date(Date.now() + env.OTP_EXPIRES_MINUTES * 60000);
-  await PendingStudentRegistration.create({ ...data, otpHash: await bcrypt.hash(otp, 10), otpExpiresAt, otpAttempts: 0, expiresAt: otpExpiresAt });
+  const { password, ...studentDetails } = data;
+  await PendingStudentRegistration.create({ ...studentDetails, passwordHash: await bcrypt.hash(password, 12), otpHash: await bcrypt.hash(otp, 10), otpExpiresAt, otpAttempts: 0, expiresAt: otpExpiresAt });
   await sendOtp(data.email, otp);
   res.status(201).json({ message: "We emailed your 6-digit code", identifier: data.email });
 }
@@ -39,7 +40,7 @@ export async function requestOtp(req: Request, res: Response) {
 export async function verifyOtp(req: Request, res: Response) {
   const { identifier, otp } = otpVerifySchema.parse(req.body);
   const email = identifier.toLowerCase();
-  const pending = await PendingStudentRegistration.findOne({ email }).select("+otpHash +otpExpiresAt +otpAttempts");
+  const pending = await PendingStudentRegistration.findOne({ email }).select("+passwordHash +otpHash +otpExpiresAt +otpAttempts");
   if (pending) {
     if (pending.otpExpiresAt.getTime() < Date.now()) { await PendingStudentRegistration.deleteOne({ _id: pending._id }); return res.status(401).json({ message: "The code is invalid or expired" }); }
     if (pending.otpAttempts >= MAX_OTP_ATTEMPTS || !(await bcrypt.compare(otp, pending.otpHash))) {
@@ -50,7 +51,7 @@ export async function verifyOtp(req: Request, res: Response) {
     }
     if (await User.exists({ role: "student", $or: [{ email: pending.email }, { rollNumber: pending.rollNumber }] })) return res.status(409).json({ message: "Unable to complete registration. Try signing in or contact support." });
     try {
-      const user = await User.create({ fullName: pending.fullName, rollNumber: pending.rollNumber, email: pending.email, mobileNumber: pending.mobileNumber, department: pending.department, role: "student", verified: true });
+      const user = await User.create({ fullName: pending.fullName, rollNumber: pending.rollNumber, email: pending.email, mobileNumber: pending.mobileNumber, department: pending.department, passwordHash: pending.passwordHash, role: "student", verified: true });
       await PendingStudentRegistration.deleteOne({ _id: pending._id });
       return res.json({ token: signToken(user.id, "student"), user: safeUser(user) });
     } catch (error: any) {
@@ -71,10 +72,36 @@ export async function verifyOtp(req: Request, res: Response) {
   res.json({ token: signToken(consumed.id, "student"), user: safeUser(consumed) });
 }
 export async function passwordLogin(req: Request, res: Response) {
-  const data = passwordLoginSchema.parse(req.body); const user = await User.findOne({ email: data.email, role: data.role, isActive: true, verified: true }).select("+passwordHash");
+  const data = passwordLoginSchema.parse(req.body);
+  const identifier = data.role === "student" ? data.identifier! : data.email!;
+  const identityQuery = data.role === "student"
+    ? { $or: [{ email: identifier.toLowerCase() }, { rollNumber: identifier.toUpperCase() }] }
+    : { email: identifier.toLowerCase() };
+  const user = await User.findOne({ ...identityQuery, role: data.role, isActive: true, verified: true }).select("+passwordHash");
   const passwordMatches = await bcrypt.compare(data.password, user?.passwordHash ?? await dummyPasswordHash);
-  if (!user?.passwordHash || !passwordMatches) return res.status(401).json({ message: "Email or password is incorrect" });
+  if (!user?.passwordHash || !passwordMatches) return res.status(401).json({ message: "Sign-in credentials are incorrect" });
   res.json({ token: signToken(user.id, data.role), user: safeUser(user) });
+}
+export async function requestStudentPasswordReset(req: Request, res: Response) {
+  const { identifier } = otpRequestSchema.parse(req.body);
+  const user = await User.findOne({ role: "student", verified: true, isActive: true, $or: [{ email: identifier.toLowerCase() }, { rollNumber: identifier.toUpperCase() }] });
+  if (user) await assignOtp(user);
+  res.json({ message: "If the account exists, a reset code has been emailed" });
+}
+export async function resetStudentPassword(req: Request, res: Response) {
+  const { identifier, otp, newPassword } = passwordResetSchema.parse(req.body);
+  const user = await User.findOne({ role: "student", verified: true, isActive: true, $or: [{ email: identifier.toLowerCase() }, { rollNumber: identifier.toUpperCase() }] }).select("+otpHash +otpExpiresAt +otpAttempts");
+  if (!user?.otpHash || !user.otpExpiresAt || user.otpExpiresAt.getTime() < Date.now()) return res.status(401).json({ message: "The code is invalid or expired" });
+  if (user.otpAttempts >= MAX_OTP_ATTEMPTS || !(await bcrypt.compare(otp, user.otpHash))) {
+    user.otpAttempts += 1;
+    if (user.otpAttempts >= MAX_OTP_ATTEMPTS) { user.otpHash = undefined; user.otpExpiresAt = undefined; }
+    await user.save();
+    return res.status(401).json({ message: user.otpAttempts >= MAX_OTP_ATTEMPTS ? "Too many incorrect attempts. Request a new code." : "The code is invalid or expired" });
+  }
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  const reset = await User.findOneAndUpdate({ _id: user._id, otpHash: user.otpHash }, { $set: { passwordHash, otpAttempts: 0 }, $unset: { otpHash: 1, otpExpiresAt: 1 } });
+  if (!reset) return res.status(401).json({ message: "The code has already been used. Request a new code." });
+  res.json({ message: "Your password has been reset. You can now sign in." });
 }
 export async function changePassword(req: Request, res: Response) {
   const data = passwordChangeSchema.parse(req.body);

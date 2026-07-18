@@ -6,6 +6,7 @@ const pendingStudentRegistrationSchema = new Schema({
   email: { type: String, required: true, trim: true, lowercase: true, index: true },
   mobileNumber: { type: String, required: true },
   department: { type: String, required: true },
+  passwordHash: { type: String, required: true, select: false },
   otpHash: { type: String, required: true, select: false },
   otpExpiresAt: { type: Date, required: true, select: false },
   otpAttempts: { type: Number, default: 0, min: 0, select: false },

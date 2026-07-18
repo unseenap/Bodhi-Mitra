@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { departments, emergencyRequestSchema, passwordChangeSchema, sessionMessageSchema, sessionSignalSchema, studentRegistrationSchema } from "./index";
+import { departments, emergencyRequestSchema, passwordChangeSchema, passwordLoginSchema, passwordResetSchema, sessionMessageSchema, sessionSignalSchema, studentRegistrationSchema } from "./index";
 
-const validStudent = { fullName: "Test Student", rollNumber: "235UCS006", email: "student@example.edu", mobileNumber: "+919000000000", department: departments[2] };
+const validStudent = { fullName: "Test Student", rollNumber: "235UCS006", email: "student@example.edu", mobileNumber: "+919000000000", department: departments[2], password: "a-private-password" };
 
 describe("GBU student registration", () => {
   it.each(["235UCS006", "225UCD007", "225UBT007", "225UCM007"])("accepts the 9-character roll number %s", rollNumber => { expect(studentRegistrationSchema.safeParse({ ...validStudent, rollNumber }).success).toBe(true); });
@@ -14,6 +14,20 @@ describe("password rotation", () => {
     expect(passwordChangeSchema.safeParse({ currentPassword: "temporary-password", newPassword: "a-new-private-password" }).success).toBe(true);
     expect(passwordChangeSchema.safeParse({ currentPassword: "temporary-password", newPassword: "short" }).success).toBe(false);
     expect(passwordChangeSchema.safeParse({ currentPassword: "temporary-password", newPassword: "temporary-password" }).success).toBe(false);
+  });
+});
+
+describe("student password authentication", () => {
+  it("accepts student identifier login and keeps staff login email-based", () => {
+    expect(passwordLoginSchema.safeParse({ identifier: "235UCS006", password: "a-private-password", role: "student" }).success).toBe(true);
+    expect(passwordLoginSchema.safeParse({ email: "admin@example.edu", password: "a-private-password", role: "admin" }).success).toBe(true);
+    expect(passwordLoginSchema.safeParse({ email: "student@example.edu", password: "a-private-password", role: "student" }).success).toBe(false);
+  });
+
+  it("requires a six-digit code and a strong new password for reset", () => {
+    expect(passwordResetSchema.safeParse({ identifier: "235UCS006", otp: "123456", newPassword: "a-new-private-password" }).success).toBe(true);
+    expect(passwordResetSchema.safeParse({ identifier: "235UCS006", otp: "123", newPassword: "a-new-private-password" }).success).toBe(false);
+    expect(passwordResetSchema.safeParse({ identifier: "235UCS006", otp: "123456", newPassword: "short" }).success).toBe(false);
   });
 });
 

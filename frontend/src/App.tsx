@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { PublicLayout } from "./components/layout/PublicLayout";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
@@ -7,6 +7,7 @@ import { SessionRoom } from "./components/session/SessionRoom";
 import { ChangePasswordPage } from "./pages/auth/ChangePasswordPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { RegisterPage } from "./pages/auth/RegisterPage";
+import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
 import { AdminOverview, AdminReports, AdminSessions, AdminStudents } from "./pages/admin/AdminPages";
 import { AdminAssessments } from "./pages/admin/AdminAssessments";
 import { PsychologistManagementPage as PsychologistManagement } from "./pages/admin/PsychologistManagementPage";
@@ -24,6 +25,7 @@ export default function App() {
       <Route index element={<HomePage />} />
       <Route path="register" element={<RegisterPage />} />
       <Route path="login" element={<LoginPage />} />
+      <Route path="forgot-password" element={<ForgotPasswordPage />} />
       <Route path="change-password" element={<ChangePasswordPage />} />
       <Route path="emergency" element={<EmergencyPage />} />
       <Route path="quick-connect" element={<QuickConnectPage />} />
@@ -32,6 +34,8 @@ export default function App() {
       <Route path="privacy" element={<ContentPage kind="privacy" />} />
       <Route path="faq" element={<FaqPage />} />
       <Route path="experts" element={<ExpertsPage />} />
+      <Route path="assessment" element={<Navigate to="/student/assessment" replace />} />
+      <Route path="assesment" element={<Navigate to="/student/assessment" replace />} />
     </Route>
     <Route element={<ProtectedRoute role="student" />}><Route element={<DashboardLayout />}>
       <Route path="student" element={<StudentOverview />} />

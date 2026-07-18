@@ -26,11 +26,19 @@ export const studentRegistrationSchema = z.object({
   rollNumber: z.string().trim().toUpperCase().regex(/^\d{3}[A-Z]{3}\d{3}$/, "Use the 9-character GBU format, for example 235UCS006"),
   email: emailSchema,
   mobileNumber: z.string().regex(/^\+91[6-9]\d{9}$/, "Use +91 followed by a valid 10-digit number"),
-  department: z.enum(departments)
+  department: z.enum(departments),
+  password: z.string().min(12, "Use at least 12 characters").max(128)
 });
 export const otpRequestSchema = z.object({ identifier: z.string().trim().min(5).max(120) });
 export const otpVerifySchema = z.object({ identifier: z.string().trim().min(5), otp: z.string().regex(/^\d{6}$/) });
-export const passwordLoginSchema = z.object({ email: emailSchema, password: z.string().min(8).max(128), role: z.enum(["psychologist", "admin"]) });
+export const passwordLoginSchema = z.object({
+  email: emailSchema.optional(), identifier: z.string().trim().min(5).max(120).optional(),
+  password: z.string().min(8).max(128), role: z.enum(roles)
+}).superRefine((data, context) => {
+  if (data.role === "student" && !data.identifier) context.addIssue({ code: "custom", path: ["identifier"], message: "Email or roll number is required" });
+  if (data.role !== "student" && !data.email) context.addIssue({ code: "custom", path: ["email"], message: "Email is required" });
+});
+export const passwordResetSchema = z.object({ identifier: z.string().trim().min(5).max(120), otp: z.string().regex(/^\d{6}$/), newPassword: z.string().min(12).max(128) });
 export const passwordChangeSchema = z.object({ currentPassword: z.string().min(8).max(128), newPassword: z.string().min(12).max(128) }).refine(data => data.currentPassword !== data.newPassword, { path: ["newPassword"], message: "Choose a password you have not used for this sign-in" });
 export const emergencyMoods = ["Anxious", "Depressed", "Overwhelmed", "Angry", "Confused", "Just need to talk"] as const;
 export const emergencyRequestSchema = z.object({
