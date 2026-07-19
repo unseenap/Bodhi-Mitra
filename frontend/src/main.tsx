@@ -40,8 +40,11 @@ import "./assessment-magic.css";
 import "./assessment-redesign.css";
 import "./react-bits-text.css";
 import "./student-dashboard-magic.css";
+import "./student-resources-magic.css";
+import "./student-sessions-magic.css";
 import "./assessment-admin.css";
 import "./dashboard-shell.css";
+import "./role-navigation-magic.css";
 import "./mobile-navigation-fix.css";
 
 initializeSeo();

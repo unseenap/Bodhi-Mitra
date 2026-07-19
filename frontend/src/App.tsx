@@ -17,7 +17,9 @@ import { EmergencyPage } from "./pages/public/EmergencyPage";
 import { HomePage } from "./pages/public/HomePage";
 import { QuickConnectPage } from "./pages/public/QuickConnectPage";
 import { AssessmentPage } from "./pages/student/AssessmentPage";
-import { StudentOverview, StudentProfile, StudentResources, StudentSession } from "./pages/student/StudentPages";
+import { StudentOverview, StudentProfile } from "./pages/student/StudentPages";
+import { StudentResources } from "./pages/student/StudentResourcesPage";
+import { StudentSessionsPage } from "./pages/student/StudentSessionsPage";
 
 export default function App() {
   return <BrowserRouter><AuthProvider><Routes>
@@ -40,8 +42,8 @@ export default function App() {
     <Route element={<ProtectedRoute role="student" />}><Route element={<DashboardLayout />}>
       <Route path="student" element={<StudentOverview />} />
       <Route path="student/assessment" element={<AssessmentPage />} />
-      <Route path="student/session" element={<StudentSession />} />
-      <Route path="student/history" element={<StudentSession />} />
+      <Route path="student/session" element={<StudentSessionsPage />} />
+      <Route path="student/history" element={<StudentSessionsPage />} />
       <Route path="student/resources" element={<StudentResources />} />
       <Route path="student/profile" element={<StudentProfile />} />
       <Route path="student/session/:sessionId" element={<SessionRoom />} />
