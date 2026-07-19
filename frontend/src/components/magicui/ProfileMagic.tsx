@@ -1,4 +1,36 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentPropsWithoutRef, type CSSProperties, type ReactNode } from "react";
+
+type AnimatedGradientTextProps = ComponentPropsWithoutRef<"span"> & {
+  speed?: number;
+  colorFrom?: string;
+  colorTo?: string;
+};
+
+// Copy-owned Magic UI adaptation that works with this project's CSS architecture.
+export function AnimatedGradientText({
+  children,
+  className = "",
+  speed = 1,
+  colorFrom = "#ffffff",
+  colorTo = "#ddd6fe",
+  style,
+  ...props
+}: AnimatedGradientTextProps) {
+  return (
+    <span
+      className={`magic-animated-gradient-text ${className}`.trim()}
+      style={{
+        "--magic-gradient-size": `${speed * 300}%`,
+        "--magic-gradient-from": colorFrom,
+        "--magic-gradient-to": colorTo,
+        ...style,
+      } as CSSProperties}
+      {...props}
+    >
+      {children}
+    </span>
+  );
+}
 
 export function ShineBorder({ duration = 10 }: { duration?: number }) {
   return <span className="magic-shine-border" style={{ "--shine-duration": `${duration}s` } as CSSProperties} aria-hidden="true" />;

@@ -18,6 +18,8 @@ import {
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { AnimatedGradientText, ShineBorder } from "../magicui/ProfileMagic";
+import { TextReveal } from "../reactbits/TextReveal";
 import { SessionErrorBoundary } from "../session/SessionErrorBoundary";
 import { Button } from "../ui/Button";
 import { GlobalFooter } from "./Footer";
@@ -54,10 +56,10 @@ const roleNavigation: Record<Role, NavigationItem[]> = {
 };
 
 const roleContext = {
-  student: { eyebrow: "Student wellbeing", title: "Student portal", status: "Private support space", icon: ShieldCheck },
-  psychologist: { eyebrow: "Care delivery", title: "Psychologist portal", status: "Professional access", icon: Stethoscope },
-  admin: { eyebrow: "Platform operations", title: "Admin control centre", status: "Secure administrator access", icon: ShieldCheck },
-} satisfies Record<Role, { eyebrow: string; title: string; status: string; icon: typeof House }>;
+  student: { eyebrow: "Student wellbeing", title: "Student portal", status: "Private support space", welcome: "A calmer place for your next step.", icon: ShieldCheck },
+  psychologist: { eyebrow: "Care delivery", title: "Psychologist portal", status: "Professional access", welcome: "Care coordination with clarity.", icon: Stethoscope },
+  admin: { eyebrow: "Platform operations", title: "Admin control centre", status: "Secure administrator access", welcome: "Clear oversight for safer support.", icon: ShieldCheck },
+} satisfies Record<Role, { eyebrow: string; title: string; status: string; welcome: string; icon: typeof House }>;
 
 export function DashboardLayout() {
   const { user, signOut } = useAuth();
@@ -125,12 +127,13 @@ export function DashboardLayout() {
             <aside id="role-navigation" className={`role-sidebar${menuOpen ? " is-open" : ""}`}>
               <a className="role-brand" href="/">
                 <img src="/images/pschylogo.svg" alt="" />
-                <span><strong>Bodhi-Mitra</strong><small>Gautam Buddha University</small></span>
+                <span><strong><AnimatedGradientText speed={1.4}>Bodhi-Mitra</AnimatedGradientText></strong><small>Gautam Buddha University</small></span>
               </a>
 
               <section className="role-context-card" aria-label={context.title}>
+                <ShineBorder duration={18} />
                 <span className="role-context-icon"><ContextIcon /></span>
-                <div><small>{context.eyebrow}</small><strong>{context.title}</strong></div>
+                <div><small>{context.eyebrow}</small><strong><AnimatedGradientText speed={1.5}>{context.title}</AnimatedGradientText></strong></div>
               </section>
 
               <section className="role-identity" aria-label="Signed-in account">
@@ -143,6 +146,7 @@ export function DashboardLayout() {
               <nav aria-label={`${context.title} navigation`}>
                 {routes.map(({ to, label, description, icon: Icon }) => (
                   <NavLink key={to} end={to.split("/").length === 2} to={to}>
+                    <span className="role-link-effect" aria-hidden="true"><i /><i /><i /><i /></span>
                     <span className="role-link-icon"><Icon /></span>
                     <span className="role-link-copy"><strong>{label}</strong><small>{description}</small></span>
                   </NavLink>
@@ -163,10 +167,12 @@ export function DashboardLayout() {
                 <div className="role-breadcrumb" aria-label="Current location">
                   <span>{context.title}</span><CaretRight /><strong>{currentRoute.label}</strong>
                 </div>
-                <p className="role-topbar-title">{currentRoute.label}</p>
+                <TextReveal key={location.pathname} as="h1" className="role-topbar-title" text={currentRoute.label} delay={0.01} />
+                <p className="role-topbar-description">{currentRoute.description} <span>{context.welcome}</span></p>
               </div>
               <div className="role-topbar-actions">
                 {role === "student" && <Link className="role-urgent-link" to="/emergency"><WarningCircle /> Emergency help</Link>}
+                <span className="role-security-chip"><ShieldCheck weight="fill" /> {context.status}</span>
                 <div className="role-topbar-account">
                   <span className="role-topbar-avatar">{user?.displayName?.trim().charAt(0).toUpperCase() || "U"}</span>
                   <span><strong>{user?.displayName ?? "Bodhi-Mitra user"}</strong><small>{identityDetail}</small></span>
