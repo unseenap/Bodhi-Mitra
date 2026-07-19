@@ -45,6 +45,23 @@
 .react-bits-spotlight:hover .react-bits-spotlight__glow { opacity: 1; }
 .react-bits-spotlight__content { position: relative; }
 
+.react-bits-shiny-text {
+  display: inline-block;
+  background: linear-gradient(110deg, #6d28d9 25%, #c4b5fd 46%, #4c1d95 58%, #6d28d9 75%);
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: react-bits-shiny-text var(--shiny-text-speed, 6s) linear infinite;
+}
+
+.react-bits-shiny-text.is-disabled { animation: none; }
+
+@keyframes react-bits-shiny-text {
+  to { background-position: -220% 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .react-bits-spotlight__glow { display: none; }
+  .react-bits-shiny-text { animation: none; }
 }
