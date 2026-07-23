@@ -7,6 +7,7 @@ import "@fontsource/manrope/800.css";
 import App from "./App";
 import { initializeSeo } from "./components/seo/SeoManager";
 import { InstallAppButton } from "./components/pwa/InstallAppButton";
+import { registerPwa } from "./lib/pwa";
 import "./styles.css";
 import "./form-controls.css";
 import "./redesign.css";
@@ -48,7 +49,7 @@ import "./role-navigation-magic.css";
 import "./mobile-navigation-fix.css";
 
 initializeSeo();
-if ("serviceWorker" in navigator) window.addEventListener("load", () => void navigator.serviceWorker.register("/sw.js"));
+window.addEventListener("load", () => void registerPwa(), { once: true });
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
