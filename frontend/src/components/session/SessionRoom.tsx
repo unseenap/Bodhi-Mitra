@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import { api } from "../../lib/api";
 import { getSocket } from "../../lib/socket";
 import { PsychologistSessionView, StudentSessionView, type SessionMessage } from "./SessionRoleViews";
+import { SessionLeaveDialog } from "./SessionLeaveDialog";
 import { buildIceServers, mediaConstraints, mediaFailureMessage } from "./webrtc";
 
 type MatchContext = SessionMatch & { mood?: string; urgent?: boolean };
@@ -36,6 +37,9 @@ export function SessionRoom() {
   const [remotePlaybackBlocked, setRemotePlaybackBlocked] = useState(false);
   const [remoteAudioReady, setRemoteAudioReady] = useState(false);
   const [callStatus, setCallStatus] = useState<"connecting" | "connected" | "reconnecting" | "failed">("connecting");
+  const [leavePromptOpen, setLeavePromptOpen] = useState(false);
+  const [leavePending, setLeavePending] = useState(false);
+  const [leaveError, setLeaveError] = useState("");
   const localVideo = useRef<HTMLVideoElement>(null);
   const remoteVideo = useRef<HTMLVideoElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
@@ -48,6 +52,60 @@ export function SessionRoom() {
   const readyHandler = useRef<(() => void) | null>(null);
   const signalHandler = useRef<((payload: { signal: SessionSignal }) => void) | null>(null);
   const reconnectTimer = useRef<number | null>(null);
+  const allowNavigation = useRef(false);
+  const guardEntryCreated = useRef(false);
+  const backNavigationPending = useRef(false);
+  const suppressNextPop = useRef(false);
+  const leavePromptOpenRef = useRef(false);
+  const leaveDestination = useRef("");
+  const endedRef = useRef(ended);
+
+  useEffect(() => { endedRef.current = ended; }, [ended]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    const marker = { ...(window.history.state ?? {}), bodhiSessionGuard: sessionId };
+    if (!guardEntryCreated.current) {
+      window.history.pushState(marker, "", window.location.href);
+      guardEntryCreated.current = true;
+    }
+
+    const handleBackNavigation = () => {
+      if (suppressNextPop.current) {
+        suppressNextPop.current = false;
+        return;
+      }
+      if (allowNavigation.current) return;
+      if (endedRef.current) {
+        allowNavigation.current = true;
+        window.history.back();
+        return;
+      }
+      if (leavePromptOpenRef.current) {
+        suppressNextPop.current = true;
+        window.history.forward();
+        return;
+      }
+      backNavigationPending.current = true;
+      leaveDestination.current = isPsychologist ? "/psychologist/sessions" : "/student/session";
+      leavePromptOpenRef.current = true;
+      setLeaveError("");
+      setLeavePromptOpen(true);
+    };
+
+    const protectActiveSession = (event: BeforeUnloadEvent) => {
+      if (endedRef.current || allowNavigation.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("popstate", handleBackNavigation);
+    window.addEventListener("beforeunload", protectActiveSession);
+    return () => {
+      window.removeEventListener("popstate", handleBackNavigation);
+      window.removeEventListener("beforeunload", protectActiveSession);
+    };
+  }, [sessionId, isPsychologist]);
 
   useEffect(() => {
     let active = true;
@@ -111,13 +169,6 @@ export function SessionRoom() {
       stopMedia(socket);
     };
   }, [sessionId, isPsychologist, match?.mode, match?.ended, mediaRevision]);
-
-  useEffect(() => {
-    if (ended || match?.mode === "chat") return;
-    const protectActiveCall = (event: BeforeUnloadEvent) => event.preventDefault();
-    window.addEventListener("beforeunload", protectActiveCall);
-    return () => window.removeEventListener("beforeunload", protectActiveCall);
-  }, [ended, match?.mode]);
 
   function stopMedia(socket = getSocket()) {
     mediaGeneration.current += 1;
@@ -305,11 +356,66 @@ export function SessionRoom() {
   function handleKeys(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); }
   }
-  function endSession() {
-    if (ended) return;
-    getSocket().timeout(8_000).emit(SOCKET_EVENTS.SESSION_END, { sessionId }, (timeoutError: Error | null, result?: Ack) => {
-      if (timeoutError || !result?.ok) setToast(result?.message ?? "Could not end the session. Please check your connection and retry.");
+  function finishSession() {
+    return new Promise<void>((resolve, reject) => {
+      if (endedRef.current) { resolve(); return; }
+      getSocket().timeout(8_000).emit(SOCKET_EVENTS.SESSION_END, { sessionId }, (timeoutError: Error | null, result?: Ack) => {
+        if (timeoutError || !result?.ok) {
+          reject(new Error(result?.message ?? "Could not end the session. Please check your connection and retry."));
+          return;
+        }
+        resolve();
+      });
     });
+  }
+  function endSession() {
+    if (endedRef.current) return;
+    void finishSession().catch(error => setToast((error as Error).message));
+  }
+  function requestLeave(destination: string) {
+    if (endedRef.current) {
+      allowNavigation.current = true;
+      navigate(destination, { replace: true });
+      return;
+    }
+    leaveDestination.current = destination;
+    backNavigationPending.current = false;
+    leavePromptOpenRef.current = true;
+    setLeaveError("");
+    setLeavePromptOpen(true);
+  }
+  function cancelLeave() {
+    if (leavePending) return;
+    setLeavePromptOpen(false);
+    leavePromptOpenRef.current = false;
+    setLeaveError("");
+    if (backNavigationPending.current) {
+      backNavigationPending.current = false;
+      suppressNextPop.current = true;
+      window.history.forward();
+    }
+  }
+  async function confirmLeave() {
+    if (leavePending) return;
+    setLeavePending(true);
+    setLeaveError("");
+    try {
+      await finishSession();
+      allowNavigation.current = true;
+      leavePromptOpenRef.current = false;
+      setLeavePromptOpen(false);
+      stopMedia();
+      if (backNavigationPending.current) {
+        backNavigationPending.current = false;
+        window.history.back();
+      } else {
+        navigate(leaveDestination.current || (isPsychologist ? "/psychologist/sessions" : "/student/session"), { replace: true });
+      }
+    } catch (error) {
+      setLeaveError((error as Error).message);
+    } finally {
+      setLeavePending(false);
+    }
   }
   function toggleAudio() {
     const track = (localVideo.current?.srcObject as MediaStream | null)?.getAudioTracks()[0];
@@ -352,7 +458,9 @@ export function SessionRoom() {
     retryMedia, remotePlaybackBlocked, remoteAudioReady, resumeRemoteAudio
   };
 
-  return isPsychologist
-    ? <PsychologistSessionView {...shared} onExit={() => navigate("/psychologist/sessions")} />
-    : <StudentSessionView {...shared} ratingOpen={ratingOpen} rating={rating} setRating={setRating} submitRating={submitRating} skipRating={() => navigate("/student/session")} />;
+  const sessionView = isPsychologist
+    ? <PsychologistSessionView {...shared} onExit={() => requestLeave("/psychologist/sessions")} />
+    : <StudentSessionView {...shared} ratingOpen={ratingOpen} rating={rating} setRating={setRating} submitRating={submitRating} skipRating={() => navigate("/student/session")} onExit={() => requestLeave("/student/session")} />;
+
+  return <>{sessionView}<SessionLeaveDialog open={leavePromptOpen} pending={leavePending} error={leaveError} onCancel={cancelLeave} onConfirm={confirmLeave} /></>;
 }

@@ -4,6 +4,7 @@ import { PublicLayout } from "./components/layout/PublicLayout";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
 import { ProtectedRoute } from "./components/layout/ProtectedRoute";
 import { SessionRoom } from "./components/session/SessionRoom";
+import { StudentSupportFlow } from "./components/student/StudentSupportFlow";
 import { ChangePasswordPage } from "./pages/auth/ChangePasswordPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { RegisterPage } from "./pages/auth/RegisterPage";
@@ -23,6 +24,7 @@ import { StudentSessionsPage } from "./pages/student/StudentSessionsPage";
 
 export default function App() {
   return <BrowserRouter><AuthProvider><Routes>
+    <Route path="__support-flow-preview" element={<main style={{ padding: "24px", maxWidth: "1000px", margin: "0 auto" }}><StudentSupportFlow /></main>} />
     <Route element={<PublicLayout />}>
       <Route index element={<HomePage />} />
       <Route path="register" element={<RegisterPage />} />

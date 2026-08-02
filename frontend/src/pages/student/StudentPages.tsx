@@ -1,56 +1,16 @@
-import { ArrowRight, BookOpen, CalendarCheck, CheckCircle, EnvelopeSimple as Mail, GraduationCap, Heartbeat, Lifebuoy, Pulse as Activity, Phone, ShieldCheck, Sparkle, WarningCircle, Wind, X } from "@phosphor-icons/react"; import { useEffect, useState } from "react"; import { Link, useNavigate } from "react-router-dom"; import { SOCKET_EVENTS, type PendingEmergency, type SessionMatch } from "@bodhi/shared"; import { BlurFade, NumberTicker, ShineBorder } from "../../components/magicui/ProfileMagic"; import { TextReveal } from "../../components/reactbits/TextReveal"; import { SpotlightCard } from "../../components/reactbits/SpotlightCard"; import { Button } from "../../components/ui/Button"; import { useAuth } from "../../context/AuthContext"; import { api } from "../../lib/api"; import { getSocket } from "../../lib/socket";
-const moods=[{label:"Anxious",symbol:"😰",tone:"yellow"},{label:"Depressed",symbol:"😔",tone:"blue"},{label:"Overwhelmed",symbol:"😵",tone:"red"},{label:"Angry",symbol:"😠",tone:"orange"},{label:"Confused",symbol:"🤔",tone:"purple"},{label:"Just need to talk",symbol:"💬",tone:"green"}];
+import { ArrowRight, BookOpen, CalendarCheck, EnvelopeSimple as Mail, GraduationCap, Lifebuoy, Pulse as Activity, Phone, ShieldCheck, Sparkle, WarningCircle, Wind } from "@phosphor-icons/react"; import { useEffect, useState } from "react"; import { Link } from "react-router-dom"; import { BlurFade, NumberTicker, ShineBorder } from "../../components/magicui/ProfileMagic"; import { TextReveal } from "../../components/reactbits/TextReveal"; import { SpotlightCard } from "../../components/reactbits/SpotlightCard"; import { StudentSupportFlow } from "../../components/student/StudentSupportFlow"; import { Button } from "../../components/ui/Button"; import { useAuth } from "../../context/AuthContext"; import { api } from "../../lib/api";
 export function StudentOverview() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [history, setHistory] = useState<any[]>([]);
-  const [modal, setModal] = useState(false);
-  const [mood, setMood] = useState("");
-  const [urgent, setUrgent] = useState(false);
-  const [waiting, setWaiting] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [toast, setToast] = useState("");
 
   useEffect(() => {
     api<any>("/student/history").then(response => setHistory(response.requests)).catch(() => {});
-    const socket = getSocket();
-    const queued = (_request: PendingEmergency) => {
-      setSending(false);
-      setWaiting(true);
-      setModal(false);
-      setToast("Request sent. A psychologist will connect shortly.");
-    };
-    const matched = (match: SessionMatch) => navigate(`/student/session/${match.sessionId}`, { state: { ...match, mood, urgent } });
-    socket.on(SOCKET_EVENTS.EMERGENCY_QUEUED, queued);
-    socket.on(SOCKET_EVENTS.SESSION_MATCHED, matched);
-    return () => {
-      socket.off(SOCKET_EVENTS.EMERGENCY_QUEUED, queued);
-      socket.off(SOCKET_EVENTS.SESSION_MATCHED, matched);
-    };
-  }, [navigate, mood, urgent]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(""), 4000);
-    return () => clearTimeout(timer);
-  }, [toast]);
-
-  function request() {
-    setSending(true);
-    getSocket().emit(SOCKET_EVENTS.EMERGENCY_REQUEST, { mode: "chat", mood, urgent }, (result: any) => {
-      if (!result.ok) {
-        setSending(false);
-        setToast(result.message);
-      }
-    });
-  }
+  }, []);
 
   const completed = history.filter(row => ["ended", "matched"].includes(row.status)).length;
 
   return (
     <section className="student-page student-home">
-      {toast && <div className="student-toast" role="status"><CheckCircle />{toast}</div>}
-
       <BlurFade className="student-welcome">
         <ShineBorder duration={14} />
         <div className="student-welcome__copy">
@@ -66,27 +26,7 @@ export function StudentOverview() {
 
       <div className="student-dashboard-grid">
         <div className="student-dashboard-main">
-          {waiting ? (
-            <BlurFade className="waiting-card">
-              <ShineBorder duration={12} />
-              <span className="student-spinner" />
-              <div>
-                <TextReveal as="h2" text="Finding the right psychologist..." delay={0.04} />
-                <p>Your request is protected. Please stay on this page while we connect you.</p>
-              </div>
-            </BlurFade>
-          ) : (
-            <BlurFade className="request-card" delay={0.1}>
-              <ShineBorder duration={12} />
-              <span><Heartbeat weight="duotone" /></span>
-              <div className="request-card__copy">
-                <small className="request-card__eyebrow">Immediate, confidential support</small>
-                <TextReveal as="h2" text="You do not have to carry it alone." delay={0.06} />
-                <p>Connect privately with a university-approved psychologist. You decide what to share.</p>
-              </div>
-              <Button onClick={() => setModal(true)}><ShieldCheck /> Request support</Button>
-            </BlurFade>
-          )}
+          <StudentSupportFlow />
         </div>
 
         <BlurFade className="student-checkin-wrap" delay={0.15}>
@@ -114,25 +54,6 @@ export function StudentOverview() {
         <Link to="/student/resources"><BookOpen /><span><strong>Grounding technique</strong>Return gently to the present</span><ArrowRight className="quick-access__arrow" /></Link>
         <Link to="/student/session"><Activity /><span><strong>Past sessions</strong><NumberTicker value={completed} /> completed</span><ArrowRight className="quick-access__arrow" /></Link>
       </BlurFade>
-
-      {modal && (
-        <div className="student-modal-backdrop">
-          <div className="student-modal">
-            <button className="modal-close" onClick={() => setModal(false)} aria-label="Close"><X /></button>
-            <h2>How are you feeling?</h2>
-            <p>This helps your psychologist support you better.</p>
-            <div className="mood-grid">
-              {moods.map(item => <button key={item.label} className={mood === item.label ? `selected ${item.tone}` : ""} onClick={() => setMood(item.label)}><span>{item.symbol}</span>{item.label}</button>)}
-            </div>
-            <label className="urgency-row">
-              <span><strong>Is this urgent?</strong><small>Priority matching</small></span>
-              <input type="checkbox" checked={urgent} onChange={event => setUrgent(event.target.checked)} />
-              <i />
-            </label>
-            <Button disabled={!mood || sending} onClick={request}><ShieldCheck />{sending ? "Sending..." : "Connect with psychologist"}</Button>
-          </div>
-        </div>
-      )}
     </section>
   );
 }

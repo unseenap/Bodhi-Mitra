@@ -1,0 +1,75 @@
+.session-leave-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(18, 12, 48, .72);
+  backdrop-filter: blur(7px);
+  animation: sessionLeaveFade .18s ease-out;
+}
+
+.session-leave-dialog {
+  width: min(500px, 100%);
+  padding: clamp(1.35rem, 4vw, 2rem);
+  border: 1px solid #ddd6fe;
+  border-radius: 20px;
+  background: #fff;
+  color: #312e81;
+  box-shadow: 0 28px 90px rgba(15, 9, 35, .34);
+  animation: sessionLeaveEnter .22s cubic-bezier(.16, 1, .3, 1);
+}
+
+.session-leave-dialog__icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 1rem;
+  border-radius: 14px;
+  background: #fff1f2;
+  color: #be123c;
+  font-size: 1.7rem;
+}
+
+.session-leave-dialog > span { color: #7c3aed; font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.session-leave-dialog h2 { margin: .55rem 0 .75rem; color: #312e81; font-size: clamp(1.35rem, 4vw, 1.8rem); line-height: 1.2; }
+.session-leave-dialog > p { margin: 0; color: #665c87; font-size: .82rem; line-height: 1.65; }
+.session-leave-dialog__assurance { display: flex; align-items: flex-start; gap: .65rem; margin: 1.2rem 0; padding: .85rem; border: 1px solid #e5e0f5; border-radius: 12px; background: #f8f7ff; }
+.session-leave-dialog__assurance > svg { flex: none; margin-top: .08rem; color: #6d28d9; font-size: 1.15rem; }
+.session-leave-dialog__assurance strong,
+.session-leave-dialog__assurance small { display: block; }
+.session-leave-dialog__assurance strong { font-size: .75rem; }
+.session-leave-dialog__assurance small { margin-top: .2rem; color: #746b98; font-size: .65rem; line-height: 1.45; }
+.session-leave-dialog__error { display: flex; align-items: flex-start; gap: .5rem; margin-bottom: 1rem; padding: .75rem; border: 1px solid #fecdd3; border-radius: 10px; background: #fff1f2; color: #9f1239; font-size: .72rem; line-height: 1.5; }
+.session-leave-dialog__error svg { flex: none; margin-top: .1rem; }
+.session-leave-dialog__actions { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; }
+.session-leave-dialog__actions button { min-height: 46px; display: inline-flex; align-items: center; justify-content: center; gap: .45rem; padding: .7rem 1rem; border-radius: 11px; font-size: .74rem; font-weight: 800; transition: transform .16s ease, border-color .16s ease, background .16s ease; }
+.session-leave-dialog__actions button:active:not(:disabled) { transform: translateY(1px); }
+.session-leave-dialog__actions button:disabled { cursor: wait; opacity: .65; }
+.session-leave-dialog__stay { border: 1px solid #d8d2ea; background: #fff; color: #312e81; }
+.session-leave-dialog__stay:hover:not(:disabled) { border-color: #9f8bd7; background: #faf9ff; }
+.session-leave-dialog__end { border: 1px solid #be123c; background: #be123c; color: #fff; }
+.session-leave-dialog__end:hover:not(:disabled) { background: #9f1239; }
+
+.clinician-session-head__title { display: flex; align-items: center; gap: .8rem; min-width: 0; }
+.clinician-session-back { width: 40px; height: 40px; display: grid; place-items: center; flex: none; border: 1px solid rgba(255,255,255,.24); border-radius: 10px; background: rgba(255,255,255,.09); color: #fff; font-size: 1rem; }
+.clinician-session-back:hover { background: rgba(255,255,255,.16); }
+
+@keyframes sessionLeaveFade { from { opacity: 0; } }
+@keyframes sessionLeaveEnter { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+
+@media (max-width: 600px) {
+  .session-leave-backdrop { align-items: end; padding: .65rem; }
+  .session-leave-dialog { padding: 1.25rem; border-radius: 18px; }
+  .session-leave-dialog__actions { grid-template-columns: 1fr; }
+  .session-leave-dialog__end { grid-row: 1; }
+  .clinician-session-head__title { align-items: flex-start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-leave-backdrop,
+  .session-leave-dialog { animation: none; }
+  .session-leave-dialog__actions button { transition: none; }
+}
