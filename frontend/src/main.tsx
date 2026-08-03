@@ -19,6 +19,7 @@ import "./admin-session.css";
 import "./psychologist-portal.css";
 import "./psychologist-theme.css";
 import "./home-rebuild.css";
+import "./home-assessment-link.css";
 import "./about-rebuild.css";
 import "./about-magic.css";
 import "./vice-chancellor-message.css";

@@ -2,6 +2,7 @@ import {
   ArrowRight,
   ChatCircleDots,
   CheckCircle,
+  ClipboardText,
   Clock,
   Heart,
   LockKey,
@@ -100,6 +101,26 @@ export function HomePage() {
 
   return (
     <div className="home-rebuild">
+      <Link
+        className="home-rebuild__assessment-marquee"
+        to="/student/assessment"
+        aria-label="Open your weekly wellbeing assessment"
+      >
+        <span className="home-rebuild__marquee-track" aria-hidden="true">
+          {[0, 1].map((group) => (
+            <span className="home-rebuild__marquee-group" key={group}>
+              {[0, 1, 2, 3].map((item) => (
+                <span className="home-rebuild__marquee-item" key={item}>
+                  <ClipboardText weight="duotone" />
+                  <strong>Weekly wellbeing check-in</strong>
+                  <span>Take your private assessment</span>
+                  <ArrowRight weight="bold" />
+                </span>
+              ))}
+            </span>
+          ))}
+        </span>
+      </Link>
       <section className="home-rebuild__hero">
         <div className="home-rebuild__hero-inner">
           <p className="home-rebuild__signature">
