@@ -12,7 +12,7 @@ function FooterBrand({ compact = false }: { compact?: boolean }) {
 
 export function GlobalFooter() {
   return <footer className="global-credit-footer">
-    <p>© {year} Managed &amp; Developed by Abhishek Prajapati, Abhinav Kumar, and Vivek Khatkar</p>
+    <p>© {year} Managed &amp; Developed by <a href="https://github.com/unseenap" target="_blank" rel="noopener noreferrer">Abhishek Prajapati</a>, Abhinav Kumar, and Vivek Khatkar</p>
   </footer>;
 }
 

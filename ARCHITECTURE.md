@@ -29,7 +29,7 @@ Chat is relayed through a private Socket.io room and is not written to MongoDB. 
 
 ## Confirmed university rules
 
-- Campus crisis hotline: `+91 1212121212`.
+- Campus crisis hotline: `+91 9650257255`.
 - Roll numbers contain exactly three digits, three letters, and three digits.
 - Students select one of the eight configured university schools during registration.
 - Admins verify qualifications before creating and activating psychologist accounts.

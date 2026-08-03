@@ -15,7 +15,7 @@
 ---
 
 > [!IMPORTANT]
-> Bodhi-Mitra supports access to qualified mental-health professionals, but it is not a replacement for emergency services. For immediate danger, call **112**. Campus crisis hotline: **+91 1212121212**.
+> Bodhi-Mitra supports access to qualified mental-health professionals, but it is not a replacement for emergency services. For immediate danger, call **112**. Campus crisis hotline: **+91 9650257255**.
 
 ## Why Bodhi-Mitra
 
@@ -31,15 +31,15 @@ Students often need support at the exact moment asking for help feels hardest. B
 
 ## Platform capabilities
 
-| Student experience | Psychologist workspace | Administration |
-|:--|:--|:--|
-| OTP-verified registration and password login | Live emergency request queue | Psychologist credential management |
-| Password recovery through verified email | Chat, voice, and video support rooms | Student and session oversight |
-| Emergency request confirmation and mode selection | Anonymous student-facing sessions | Assessment analytics |
-| Mood and urgency context | Safety escalation tools | Safety report resolution |
-| Weekly bilingual wellbeing assessment | Private temporary scratchpad | Platform metrics and reporting |
-| Session history and profile | Availability and session history | Expert-directory publishing |
-| Installable Progressive Web App | Responsive clinical workspace | Role-protected control panel |
+| Student experience                                | Psychologist workspace               | Administration                     |
+| :------------------------------------------------ | :----------------------------------- | :--------------------------------- |
+| OTP-verified registration and password login      | Live emergency request queue         | Psychologist credential management |
+| Password recovery through verified email          | Chat, voice, and video support rooms | Student and session oversight      |
+| Emergency request confirmation and mode selection | Anonymous student-facing sessions    | Assessment analytics               |
+| Mood and urgency context                          | Safety escalation tools              | Safety report resolution           |
+| Weekly bilingual wellbeing assessment             | Private temporary scratchpad         | Platform metrics and reporting     |
+| Session history and profile                       | Availability and session history     | Expert-directory publishing        |
+| Installable Progressive Web App                   | Responsive clinical workspace        | Role-protected control panel       |
 
 ## Application preview
 
@@ -49,17 +49,17 @@ Students often need support at the exact moment asking for help feels hardest. B
 
 ## Technology
 
-| Layer | Technology |
-|:--|:--|
-| Frontend | React 19, TypeScript, Vite, React Router, Phosphor Icons |
-| Backend | Node.js, Express 5, TypeScript, Socket.IO |
-| Database | MongoDB and Mongoose |
-| Validation | Shared Zod schemas and socket contracts |
-| Authentication | JWT, bcrypt, email OTP, role-based authorization |
-| Realtime | Socket.IO rooms and authenticated event handlers |
-| Calls | Native WebRTC, STUN, authenticated short-lived TURN credentials |
-| Notifications | Nodemailer email delivery and Web Push with VAPID |
-| Hosting | Netlify frontend, Render backend, MongoDB Atlas |
+| Layer          | Technology                                                      |
+| :------------- | :-------------------------------------------------------------- |
+| Frontend       | React 19, TypeScript, Vite, React Router, Phosphor Icons        |
+| Backend        | Node.js, Express 5, TypeScript, Socket.IO                       |
+| Database       | MongoDB and Mongoose                                            |
+| Validation     | Shared Zod schemas and socket contracts                         |
+| Authentication | JWT, bcrypt, email OTP, role-based authorization                |
+| Realtime       | Socket.IO rooms and authenticated event handlers                |
+| Calls          | Native WebRTC, STUN, authenticated short-lived TURN credentials |
+| Notifications  | Nodemailer email delivery and Web Push with VAPID               |
+| Hosting        | Netlify frontend, Render backend, MongoDB Atlas                 |
 
 ## Architecture
 
@@ -173,10 +173,10 @@ The seed uses `ADMIN_EMAIL` and `ADMIN_PASSWORD` from `backend/.env`. Change the
 npm run dev
 ```
 
-| Service | Local address |
-|:--|:--|
-| Frontend | `http://localhost:5173` |
-| Backend | `http://localhost:4000` |
+| Service      | Local address                      |
+| :----------- | :--------------------------------- |
+| Frontend     | `http://localhost:5173`            |
+| Backend      | `http://localhost:4000`            |
 | Health check | `http://localhost:4000/api/health` |
 
 When SMTP is empty during development, generated OTP codes are written to the backend terminal.
@@ -185,28 +185,28 @@ When SMTP is empty during development, generated OTP codes are written to the ba
 
 ### Frontend
 
-| Variable | Purpose |
-|:--|:--|
-| `VITE_API_URL` | Express API base URL ending in `/api` |
-| `VITE_SOCKET_URL` | Socket.IO backend origin |
-| `VITE_VAPID_PUBLIC_KEY` | Public Web Push key |
-| `VITE_STUN_URL` | Comma-separated STUN server URLs |
-| `VITE_TURN_*` | Local-development fallback only |
+| Variable                | Purpose                               |
+| :---------------------- | :------------------------------------ |
+| `VITE_API_URL`          | Express API base URL ending in `/api` |
+| `VITE_SOCKET_URL`       | Socket.IO backend origin              |
+| `VITE_VAPID_PUBLIC_KEY` | Public Web Push key                   |
+| `VITE_STUN_URL`         | Comma-separated STUN server URLs      |
+| `VITE_TURN_*`           | Local-development fallback only       |
 
 ### Backend
 
-| Variable | Purpose |
-|:--|:--|
-| `MONGODB_URI` | MongoDB connection string |
-| `JWT_SECRET` | Minimum 32-character signing secret |
-| `CLIENT_URL` | Exact deployed frontend origin |
-| `SMTP_*` | Nodemailer transport configuration |
-| `VAPID_*` | Web Push credentials |
-| `TURN_URL` | Comma-separated TURN UDP, TCP, and TLS URLs |
-| `TURN_SHARED_SECRET` | Coturn REST authentication secret |
-| `TURN_TTL_SECONDS` | Lifetime of participant-only TURN credentials |
-| `ADMIN_EMAIL` | Seeded administrator email |
-| `ADMIN_PASSWORD` | Seeded temporary administrator password |
+| Variable             | Purpose                                       |
+| :------------------- | :-------------------------------------------- |
+| `MONGODB_URI`        | MongoDB connection string                     |
+| `JWT_SECRET`         | Minimum 32-character signing secret           |
+| `CLIENT_URL`         | Exact deployed frontend origin                |
+| `SMTP_*`             | Nodemailer transport configuration            |
+| `VAPID_*`            | Web Push credentials                          |
+| `TURN_URL`           | Comma-separated TURN UDP, TCP, and TLS URLs   |
+| `TURN_SHARED_SECRET` | Coturn REST authentication secret             |
+| `TURN_TTL_SECONDS`   | Lifetime of participant-only TURN credentials |
+| `ADMIN_EMAIL`        | Seeded administrator email                    |
+| `ADMIN_PASSWORD`     | Seeded temporary administrator password       |
 
 > [!CAUTION]
 > Variables beginning with `VITE_` are embedded in public frontend JavaScript. Production TURN secrets, SMTP passwords, database credentials, JWT secrets, and administrator passwords belong only in the backend hosting environment.
@@ -233,13 +233,13 @@ npm test
 npm run build
 ```
 
-| Command | What it validates |
-|:--|:--|
-| `npm run dev` | Starts API and frontend development servers |
-| `npm run typecheck` | Checks all TypeScript workspaces |
-| `npm test` | Runs shared, backend, and frontend tests |
-| `npm run build` | Creates production backend and frontend builds |
-| `npm run seed` | Creates or updates the configured administrator |
+| Command             | What it validates                               |
+| :------------------ | :---------------------------------------------- |
+| `npm run dev`       | Starts API and frontend development servers     |
+| `npm run typecheck` | Checks all TypeScript workspaces                |
+| `npm test`          | Runs shared, backend, and frontend tests        |
+| `npm run build`     | Creates production backend and frontend builds  |
+| `npm run seed`      | Creates or updates the configured administrator |
 
 ## Privacy and security model
 
