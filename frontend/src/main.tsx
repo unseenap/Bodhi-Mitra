@@ -51,6 +51,7 @@ import "./assessment-admin.css";
 import "./dashboard-shell.css";
 import "./role-navigation-magic.css";
 import "./mobile-navigation-fix.css";
+import "./notifications.css";
 
 initializeSeo();
 window.addEventListener("load", () => void registerPwa(), { once: true });

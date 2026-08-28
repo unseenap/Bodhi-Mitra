@@ -7,6 +7,16 @@ import { adminAnalytics, adminReports, adminSessions, adminStudents, resolveRepo
 import { escalateSession, rateSession, sessionDetails, sessionIceConfiguration } from "../controllers/session.controller.js";
 import { psychologistProfile, psychologistSummary, setAvailability } from "../controllers/psychologist.controller.js";
 import { adminAssessments, assessmentStatus, submitAssessment } from "../controllers/assessment.controller.js";
+import {
+  getNotificationPreferences,
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  subscribeNotificationPush,
+  unreadNotificationCount,
+  unsubscribeNotificationPush,
+  updateNotificationPreferences
+} from "../controllers/notification.controller.js";
 
 export const api = Router();
 const otpLimit = rateLimit({ windowMs: 10 * 60 * 1000, limit: 3, standardHeaders: true, legacyHeaders: false, message: { message: "Too many code requests. Please wait before trying again" } });
@@ -20,6 +30,15 @@ api.post("/auth/student/reset-password", otpVerifyLimit, resetStudentPassword);
 api.post("/auth/login", rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { message: "Too many failed sign-in attempts. Please wait before trying again" } }), passwordLogin);
 api.get("/auth/me", requireAuth(), me);
 api.post("/auth/change-password", requireAuth(["psychologist", "admin"]), changePassword);
+const notificationMutationLimit = rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false });
+api.get("/notifications", requireAuth(), listNotifications);
+api.get("/notifications/unread-count", requireAuth(), unreadNotificationCount);
+api.patch("/notifications/:notificationId/read", notificationMutationLimit, requireAuth(), markNotificationRead);
+api.post("/notifications/mark-all-read", notificationMutationLimit, requireAuth(), markAllNotificationsRead);
+api.get("/notifications/preferences", requireAuth(), getNotificationPreferences);
+api.patch("/notifications/preferences", notificationMutationLimit, requireAuth(), updateNotificationPreferences);
+api.post("/notifications/push-subscription", notificationMutationLimit, requireAuth(), subscribeNotificationPush);
+api.delete("/notifications/push-subscription", notificationMutationLimit, requireAuth(), unsubscribeNotificationPush);
 api.get("/experts", experts);
 api.get("/student/history", requireAuth(["student"]), studentHistory);
 api.get("/student/emergency/active", requireAuth(["student"]), activeStudentEmergency);

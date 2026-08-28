@@ -6,6 +6,7 @@ import { User } from "../models/User.js";
 import { PendingStudentRegistration } from "../models/PendingStudentRegistration.js";
 import { sendOtp } from "../services/email.service.js";
 import { makeOtp, safeUser, signToken } from "../utils/auth.js";
+import { createNotification } from "../services/notification.service.js";
 
 const MAX_OTP_ATTEMPTS = 5;
 const dummyPasswordHash = bcrypt.hash("Bodhi-Mitra-dummy-password", 12);
@@ -101,6 +102,11 @@ export async function resetStudentPassword(req: Request, res: Response) {
   const passwordHash = await bcrypt.hash(newPassword, 12);
   const reset = await User.findOneAndUpdate({ _id: user._id, otpHash: user.otpHash }, { $set: { passwordHash, otpAttempts: 0 }, $unset: { otpHash: 1, otpExpiresAt: 1 } });
   if (!reset) return res.status(401).json({ message: "The code has already been used. Request a new code." });
+  await createNotification({
+    recipientId: String(reset._id), recipientRole: "student", type: "account.password.changed",
+    title: "Password changed", message: "Your Bodhi-Mitra password was changed. Contact support if this was not you.",
+    priority: "high", actionUrl: "/student/profile", deduplicationKey: `password-reset:${reset._id}:${Date.now()}`
+  });
   res.json({ message: "Your password has been reset. You can now sign in." });
 }
 export async function changePassword(req: Request, res: Response) {
@@ -110,6 +116,11 @@ export async function changePassword(req: Request, res: Response) {
   user.passwordHash = await bcrypt.hash(data.newPassword, 12);
   user.mustChangePassword = false;
   await user.save();
+  await createNotification({
+    recipientId: user.id, recipientRole: user.role, type: "account.password.changed",
+    title: "Password changed", message: "Your Bodhi-Mitra password was changed. Contact support if this was not you.",
+    priority: "high", actionUrl: `/${user.role}`, deduplicationKey: `password-change:${user.id}:${Date.now()}`
+  });
   res.json({ token: signToken(user.id, user.role), user: safeUser(user) });
 }
 export async function me(req: Request, res: Response) { const user = await User.findById(req.auth!.id); if (!user) return res.status(404).json({ message: "Account not found" }); res.json({ user: safeUser(user) }); }

@@ -5,6 +5,7 @@ import { env } from "../config/env.js";
 import { AuditLog } from "../models/AuditLog.js";
 import { EmergencyRequest } from "../models/EmergencyRequest.js";
 import { Session } from "../models/Session.js";
+import { createNotification, createNotificationForRole } from "../services/notification.service.js";
 
 function participant(sessionId: string, userId: string) {
   return Session.findOne({
@@ -90,7 +91,19 @@ export async function rateSession(req: Request, res: Response) {
       targetId: session.sessionId,
       metadata: { rating, resolved: false }
     });
+    await createNotificationForRole("admin", {
+      type: "session.feedback.low", title: "Session feedback needs review",
+      message: "A low session rating requires attention.", priority: "high", actionUrl: "/admin/reports",
+      entityType: "Session", entityId: session.sessionId,
+      deduplicationKey: recipientId => `session-feedback-low:${session.sessionId}:${recipientId}`
+    });
   }
+  await createNotification({
+    recipientId: req.auth!.id, recipientRole: "student", type: "session.feedback.saved",
+    title: "Feedback saved", message: "Thank you. Your session feedback was saved.",
+    actionUrl: "/student/history", entityType: "Session", entityId: session.sessionId,
+    deduplicationKey: `session-feedback-saved:${session.sessionId}`
+  });
   res.json({
     message: "Thank you for your feedback",
     feedback: { sessionId: session.sessionId, rating, savedAt: session.feedbackSubmittedAt }
@@ -121,6 +134,12 @@ export async function escalateSession(req: Request, res: Response) {
     targetType: "Session",
     targetId: session.sessionId,
     metadata: { resolved: false, raisedAt: new Date() }
+  });
+  await createNotificationForRole("admin", {
+    type: "session.safety.escalated", title: "Safety alert requires attention",
+    message: "A protected safety report requires immediate review.", priority: "critical", actionUrl: "/admin/reports",
+    entityType: "Session", entityId: session.sessionId, channels: ["in_app", "socket", "push"],
+    deduplicationKey: recipientId => `session-safety:${session.sessionId}:${recipientId}`
   });
   res.status(201).json({ message: "Safety alert sent to the administration team" });
 }

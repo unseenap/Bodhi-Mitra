@@ -23,6 +23,8 @@ import { TextReveal } from "../reactbits/TextReveal";
 import { SessionErrorBoundary } from "../session/SessionErrorBoundary";
 import { Button } from "../ui/Button";
 import { GlobalFooter } from "./Footer";
+import { NotificationBell } from "../notifications/NotificationBell";
+import { NotificationCenterProvider } from "../../context/NotificationCenterContext";
 
 type Role = "student" | "psychologist" | "admin";
 type NavigationItem = {
@@ -70,7 +72,9 @@ export function DashboardLayout() {
   const context = roleContext[role];
   const ContextIcon = context.icon;
   const routes = roleNavigation[role];
-  const currentRoute = routes.find(({ to }) =>
+  const currentRoute = location.pathname === "/notifications"
+    ? { to: "/notifications", label: "Notifications", description: "Private updates and actions", icon: WarningCircle }
+    : routes.find(({ to }) =>
     to === `/${role}` ? location.pathname === to : location.pathname.startsWith(to),
   ) ?? routes[0];
 
@@ -96,7 +100,7 @@ export function DashboardLayout() {
   );
 
   return (
-    <>
+    <NotificationCenterProvider>
       <div className={`dashboard role-dashboard role-dashboard--${role}${isLiveSession ? " dashboard--live-session" : ""}`}>
         {!isLiveSession && (
           <>
@@ -105,16 +109,19 @@ export function DashboardLayout() {
                 <img src="/images/pschylogo.svg" alt="" />
                 <span><strong>Bodhi-Mitra</strong><small>{context.title}</small></span>
               </a>
-              <button
-                className="role-menu-trigger"
-                type="button"
-                aria-label={menuOpen ? "Close navigation" : "Open navigation"}
-                aria-expanded={menuOpen}
-                aria-controls="role-navigation"
-                onClick={() => setMenuOpen((open) => !open)}
-              >
-                {menuOpen ? <X /> : <List />}
-              </button>
+              <div className="role-mobile-actions">
+                <NotificationBell mobile />
+                <button
+                  className="role-menu-trigger"
+                  type="button"
+                  aria-label={menuOpen ? "Close navigation" : "Open navigation"}
+                  aria-expanded={menuOpen}
+                  aria-controls="role-navigation"
+                  onClick={() => setMenuOpen((open) => !open)}
+                >
+                  {menuOpen ? <X /> : <List />}
+                </button>
+              </div>
             </header>
 
             <button
@@ -173,6 +180,7 @@ export function DashboardLayout() {
               <div className="role-topbar-actions">
                 {role === "student" && <Link className="role-urgent-link" to="/emergency"><WarningCircle /> Emergency help</Link>}
                 <span className="role-security-chip"><ShieldCheck weight="fill" /> {context.status}</span>
+                <NotificationBell />
                 <div className="role-topbar-account">
                   <span className="role-topbar-avatar">{user?.displayName?.trim().charAt(0).toUpperCase() || "U"}</span>
                   <span><strong>{user?.displayName ?? "Bodhi-Mitra user"}</strong><small>{identityDetail}</small></span>
@@ -184,6 +192,6 @@ export function DashboardLayout() {
         </main>
       </div>
       {!isLiveSession && <GlobalFooter />}
-    </>
+    </NotificationCenterProvider>
   );
 }

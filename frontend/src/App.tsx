@@ -20,6 +20,7 @@ import { AssessmentPage } from "./pages/student/AssessmentPage";
 import { StudentOverview, StudentProfile } from "./pages/student/StudentPages";
 import { StudentResources } from "./pages/student/StudentResourcesPage";
 import { StudentSessionsPage } from "./pages/student/StudentSessionsPage";
+import { NotificationsPage } from "./pages/notifications/NotificationsPage";
 
 export default function App() {
   return <BrowserRouter><AuthProvider><Routes>
@@ -39,6 +40,9 @@ export default function App() {
       <Route path="assessment" element={<Navigate to="/student/assessment" replace />} />
       <Route path="assesment" element={<Navigate to="/student/assessment" replace />} />
     </Route>
+    <Route element={<ProtectedRoute />}><Route element={<DashboardLayout />}>
+      <Route path="notifications" element={<NotificationsPage />} />
+    </Route></Route>
     <Route element={<ProtectedRoute role="student" />}><Route element={<DashboardLayout />}>
       <Route path="student" element={<StudentOverview />} />
       <Route path="student/assessment" element={<AssessmentPage />} />

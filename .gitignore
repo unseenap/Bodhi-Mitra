@@ -18,3 +18,10 @@ dist/
 coverage/
 *.log
 .DS_Store
+
+# Local product planning documents
+/notification-plan.md
+
+# Local SQL schemas, seeds, migrations, and MySQL planning files
+*.sql
+/backend/database/mysql/

@@ -15,6 +15,7 @@ import { Session } from "../models/Session.js";
 import { User } from "../models/User.js";
 import { acceptEmergency, createEmergency, expireEmergency, hotlines } from "../services/emergency.service.js";
 import { verifyToken } from "../utils/auth.js";
+import { createNotification, createNotificationForRole, setNotificationEmitter } from "../services/notification.service.js";
 
 type Ack = (result: { ok: boolean; message?: string }) => void;
 type SocketAuth = { id: string; role: "student" | "psychologist" | "admin" };
@@ -50,6 +51,9 @@ export function createSocketServer(httpServer: HttpServer) {
     maxHttpBufferSize: 64 * 1024,
     perMessageDeflate: false
   });
+  setNotificationEmitter((recipientId, payload) => {
+    io.to(`student:${recipientId}`).to(`psychologist:${recipientId}`).to(`admin:${recipientId}`).emit("notification:new", payload);
+  });
 
   io.use(async (socket, next) => {
     try {
@@ -69,6 +73,20 @@ export function createSocketServer(httpServer: HttpServer) {
     if (!expired) return;
     io.to(`student:${String(expired.studentId)}`).emit(SOCKET_EVENTS.EMERGENCY_TIMEOUT, { hotlines });
     io.to("psychologists").emit(SOCKET_EVENTS.EMERGENCY_TAKEN, { requestId });
+    await Promise.allSettled([
+      createNotification({
+        recipientId: String(expired.studentId), recipientRole: "student", type: "emergency.request.timeout",
+        title: "Support options are ready", message: "Immediate support options are available.", priority: "critical",
+        actionUrl: "/emergency", entityType: "EmergencyRequest", entityId: requestId,
+        channels: ["in_app", "socket", "push"], deduplicationKey: `emergency-timeout:${requestId}`
+      }),
+      createNotificationForRole("admin", {
+        type: "emergency.request.timeout", title: "Support request timed out",
+        message: "A support request reached the response timeout.", priority: "high", actionUrl: "/admin/reports",
+        entityType: "EmergencyRequest", entityId: requestId, channels: ["in_app", "socket", "push"],
+        deduplicationKey: recipientId => `emergency-timeout:${requestId}:${recipientId}`
+      })
+    ]);
   }
 
   // Recover timeout delivery after a process restart. The database remains the
@@ -100,6 +118,21 @@ export function createSocketServer(httpServer: HttpServer) {
         const safe = { requestId: request.id, anonId: request.anonId, mode: request.mode, mood: request.mood, urgent: request.urgent, waitStartedAt: request.createdAt.toISOString() };
         socket.emit(SOCKET_EVENTS.EMERGENCY_QUEUED, safe);
         io.to("psychologists").emit(SOCKET_EVENTS.EMERGENCY_NEW, safe);
+        await Promise.allSettled([
+          createNotification({
+            recipientId: id, recipientRole: "student", type: "emergency.request.created",
+            title: "Support request received", message: "We are finding an available psychologist for you.",
+            actionUrl: "/student", entityType: "EmergencyRequest", entityId: request.id,
+            deduplicationKey: `emergency-created:${request.id}`
+          }),
+          createNotificationForRole("psychologist", {
+            type: request.urgent ? "emergency.request.urgent" : "emergency.request.created",
+            title: request.urgent ? "Urgent support request" : "New support request",
+            message: `A student is waiting for ${request.mode} support.`, priority: "critical", actionUrl: "/psychologist",
+            entityType: "EmergencyRequest", entityId: request.id, channels: ["in_app", "socket", "push"],
+            deduplicationKey: recipientId => `emergency-new:${request.id}:${recipientId}`
+          }, { isAvailable: true })
+        ]);
         const timer = setTimeout(async () => {
           try { await expireAndNotify(request.id); }
           finally { timers.delete(request.id); }
@@ -125,6 +158,20 @@ export function createSocketServer(httpServer: HttpServer) {
         io.to(`student:${String(result.request.studentId)}`).emit(SOCKET_EVENTS.SESSION_MATCHED, { ...match, peerLabel: "Bodhi-Mitra psychologist" });
         socket.emit(SOCKET_EVENTS.SESSION_MATCHED, match);
         io.to("psychologists").emit(SOCKET_EVENTS.EMERGENCY_TAKEN, { requestId });
+        await Promise.allSettled([
+          createNotification({
+            recipientId: String(result.request.studentId), recipientRole: "student", type: "emergency.request.matched",
+            title: "A psychologist is ready", message: "Your private support session is ready to open.", priority: "critical",
+            actionUrl: `/student/session/${result.session.sessionId}`, entityType: "Session", entityId: result.session.sessionId,
+            channels: ["in_app", "socket", "push"], deduplicationKey: `emergency-matched:${requestId}`
+          }),
+          createNotification({
+            recipientId: id, recipientRole: "psychologist", type: "session.created", title: "Private session ready",
+            message: "The secure support session is ready to open.", priority: "high",
+            actionUrl: `/psychologist/session/${result.session.sessionId}`, entityType: "Session", entityId: result.session.sessionId,
+            deduplicationKey: `session-created:${result.session.sessionId}`
+          })
+        ]);
         ack?.({ ok: true });
       } catch (error) {
         ack?.({ ok: false, message: messageOf(error) });
@@ -202,10 +249,24 @@ export function createSocketServer(httpServer: HttpServer) {
         const { sessionId } = sessionIdSchema.parse(payload);
         const candidate = await activeParticipant(sessionId, id);
         if (!candidate) throw new Error("Active session not found");
-        const session = await Session.findOneAndUpdate({ _id: candidate._id, endedAt: { $exists: false } }, { endedAt: new Date() });
+        const session = await Session.findOneAndUpdate({ _id: candidate._id, endedAt: { $exists: false } }, { endedAt: new Date() }).select("+studentId");
         if (!session) throw new Error("Session has already ended");
         await EmergencyRequest.findByIdAndUpdate(session.requestId, { status: "ended" });
         io.to(`session:${sessionId}`).emit(SOCKET_EVENTS.SESSION_END, { sessionId });
+        await Promise.allSettled([
+          createNotification({
+            recipientId: String(session.studentId), recipientRole: "student", type: "session.ended",
+            title: "Session ended", message: "Your private support session has ended. You can now share feedback.", priority: "high",
+            actionUrl: `/student/session/${sessionId}`, entityType: "Session", entityId: sessionId,
+            deduplicationKey: `session-ended:${sessionId}:student`
+          }),
+          createNotification({
+            recipientId: String(session.psychologistId), recipientRole: "psychologist", type: "session.ended",
+            title: "Session completed", message: "The private support session has ended.", priority: "high",
+            actionUrl: "/psychologist/sessions", entityType: "Session", entityId: sessionId,
+            deduplicationKey: `session-ended:${sessionId}:psychologist`
+          })
+        ]);
         ack?.({ ok: true });
       } catch (error) {
         ack?.({ ok: false, message: messageOf(error) });

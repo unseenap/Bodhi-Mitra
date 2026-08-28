@@ -4,6 +4,7 @@ import { z } from "zod";
 import { Assessment } from "../models/Assessment.js";
 import { AuditLog } from "../models/AuditLog.js";
 import { User } from "../models/User.js";
+import { createNotification, createNotificationForRole } from "../services/notification.service.js";
 
 const submissionSchema = z.object({ answers: z.array(z.boolean()).length(20) }).strict();
 export const ASSESSMENT_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -63,7 +64,19 @@ export async function submitAssessment(req: Request, res: Response) {
     const result = await Assessment.create({ studentId: req.auth!.id, monthKey: randomUUID(), answers, score, band, safetyFlag, completedAt: now });
     if (band === "urgent" || safetyFlag) {
       await AuditLog.create({ action: "assessment.support_alert", actorId: req.auth!.id, actorRole: "student", targetType: "Assessment", targetId: result.id, metadata: { score, band, safetyFlag, resolved: false } });
+      await createNotificationForRole("admin", {
+        type: "assessment.support_alert", title: "Wellbeing alert requires review",
+        message: "A protected assessment alert requires attention.", priority: "critical", actionUrl: "/admin/assessments",
+        entityType: "Assessment", entityId: result.id, channels: ["in_app", "socket", "push"],
+        deduplicationKey: recipientId => `assessment-alert:${result.id}:${recipientId}`
+      });
     }
+    await createNotification({
+      recipientId: req.auth!.id, recipientRole: "student", type: "assessment.submitted",
+      title: "Check-in saved", message: "Your weekly wellbeing check-in was saved.",
+      actionUrl: "/student/assessment", entityType: "Assessment", entityId: result.id,
+      deduplicationKey: `assessment-submitted:${result.id}`
+    });
     return res.status(201).json({ result, nextEligibleAt });
   } catch (error) {
     await User.updateOne({ _id: req.auth!.id, assessmentNextEligibleAt: nextEligibleAt }, { $unset: { assessmentNextEligibleAt: 1 } });

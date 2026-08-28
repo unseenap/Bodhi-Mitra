@@ -3,7 +3,6 @@ import { env, hotlines } from "../config/env.js";
 import { EmergencyRequest } from "../models/EmergencyRequest.js";
 import { Session } from "../models/Session.js";
 import { User } from "../models/User.js";
-import { notifyPsychologists } from "./push.service.js";
 
 export async function createEmergency(studentId: string, mode: string, context?: { mood?: string; urgent?: boolean }) {
   const active = await EmergencyRequest.findOne({ studentId, status: { $in: ["pending", "matched"] } }).select("+studentId");
@@ -17,7 +16,6 @@ export async function createEmergency(studentId: string, mode: string, context?:
     }
     throw error;
   }
-  void notifyPsychologists({ requestId: request.id, mode: request.mode });
   return request;
 }
 export async function acceptEmergency(requestId: string, psychologistId: string) {
