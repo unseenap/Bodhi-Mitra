@@ -22,6 +22,7 @@ type NotificationCenterValue = {
   error: string;
   refresh: () => Promise<void>;
   markRead: (id: string) => Promise<void>;
+  acknowledge: (id: string) => Promise<void>;
   markAllRead: () => Promise<void>;
 };
 
@@ -91,7 +92,20 @@ export function NotificationCenterProvider({ children }: { children: ReactNode }
     }
   }, [refresh]);
 
-  const value = useMemo(() => ({ notifications, unread, loading, error, refresh, markRead, markAllRead }), [notifications, unread, loading, error, refresh, markRead, markAllRead]);
+  const acknowledge = useCallback(async (id: string) => {
+    const acknowledgedAt = new Date().toISOString();
+    const current = notifications.find(item => item.id === id);
+    setNotifications(items => items.map(item => item.id === id ? { ...item, readAt: item.readAt ?? acknowledgedAt, acknowledgedAt } : item));
+    if (!current?.readAt) setUnread(value => Math.max(0, value - 1));
+    try {
+      await api(`/notifications/${id}/acknowledge`, { method: "PATCH" });
+    } catch (requestError) {
+      await refresh();
+      throw requestError;
+    }
+  }, [notifications, refresh]);
+
+  const value = useMemo(() => ({ notifications, unread, loading, error, refresh, markRead, acknowledge, markAllRead }), [notifications, unread, loading, error, refresh, markRead, acknowledge, markAllRead]);
   return <NotificationCenterContext.Provider value={value}>{children}</NotificationCenterContext.Provider>;
 }
 

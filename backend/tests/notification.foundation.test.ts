@@ -9,6 +9,8 @@ describe("notification privacy and access boundaries", () => {
     expect(source).toContain("recipientId: req.auth!.id");
     expect(source).toContain("recipientRole: req.auth!.role");
     expect(source).not.toContain("req.body.recipientId");
+    expect(source).toContain("acknowledgeNotification");
+    expect(source).toContain('priority: { $in: ["critical", "high"] }');
   });
 
   it("rejects external notification action links", async () => {
@@ -16,6 +18,25 @@ describe("notification privacy and access boundaries", () => {
     expect(source).toContain('value.startsWith("/")');
     expect(source).toContain('value.startsWith("//")');
     expect(source).toContain("Notification action URL must be an internal application path");
+  });
+});
+
+describe("session notification lifecycle", () => {
+  it("tracks confirmed disconnect episodes and reconnects", async () => {
+    const source = await read("../src/socket/index.ts");
+    expect(source).toContain("joinedPresence");
+    expect(source).toContain("disconnectedPresence");
+    expect(source).toContain("SESSION_PARTICIPANT_DISCONNECTED");
+    expect(source).toContain("SESSION_PARTICIPANT_RECONNECTED");
+    expect(source).toContain("session-disconnected:");
+    expect(source).toContain("session-reconnected:");
+  });
+
+  it("creates call-ready notifications only from psychologist readiness", async () => {
+    const source = await read("../src/socket/index.ts");
+    expect(source).toContain('role === "psychologist" && session.mode !== "chat"');
+    expect(source).toContain("SESSION_CALL_READY");
+    expect(source).toContain('type: "session.call.incoming"');
   });
 });
 

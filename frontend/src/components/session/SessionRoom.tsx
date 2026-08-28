@@ -142,13 +142,27 @@ export function SessionRoom() {
       stopMedia();
       if (!isPsychologist) setRatingOpen(true);
     };
+    const participantJoined = () => setToast(isPsychologist ? "The student joined the private session." : "Your psychologist joined the private session.");
+    const participantDisconnected = () => {
+      setToast("The other participant disconnected. Their secure place in this session is being held.");
+      if (match.mode !== "chat") setCallStatus("reconnecting");
+    };
+    const participantReconnected = () => {
+      setToast("The secure session connection has been restored.");
+      if (match.mode !== "chat") setCallStatus("connecting");
+    };
+    const callReady = () => setToast(`Your secure ${match.mode} call is ready to connect.`);
     const connectError = () => setSessionError("The secure connection was interrupted. Check your internet connection and try again.");
 
     socket.on(SOCKET_EVENTS.SESSION_MESSAGE, receive);
     socket.on(SOCKET_EVENTS.SESSION_END, sessionEnded);
+    socket.on(SOCKET_EVENTS.SESSION_PARTICIPANT_JOINED, participantJoined);
+    socket.on(SOCKET_EVENTS.SESSION_PARTICIPANT_DISCONNECTED, participantDisconnected);
+    socket.on(SOCKET_EVENTS.SESSION_PARTICIPANT_RECONNECTED, participantReconnected);
+    socket.on(SOCKET_EVENTS.SESSION_CALL_READY, callReady);
     socket.on("connect_error", connectError);
 
-    socket.timeout(8_000).emit(SOCKET_EVENTS.SESSION_JOIN, { sessionId }, async (timeoutError: Error | null, result?: Ack) => {
+    const joinSession = () => socket.timeout(8_000).emit(SOCKET_EVENTS.SESSION_JOIN, { sessionId }, async (timeoutError: Error | null, result?: Ack) => {
       if (disposed) return;
       if (timeoutError || !result?.ok) {
         setSessionError(result?.message ?? "The session could not be joined. Please return to your dashboard and reconnect.");
@@ -156,15 +170,23 @@ export function SessionRoom() {
       }
       setSessionError("");
       if (match.mode !== "chat") {
+        if (peerConnection.current) stopMedia(socket);
         const mediaReady = await setupMedia(socket);
         if (!disposed && mediaReady) socket.emit(SOCKET_EVENTS.SESSION_READY, { sessionId });
       } else socket.emit(SOCKET_EVENTS.SESSION_READY, { sessionId });
     });
+    socket.on("connect", joinSession);
+    if (socket.connected) joinSession();
 
     return () => {
       disposed = true;
       socket.off(SOCKET_EVENTS.SESSION_MESSAGE, receive);
       socket.off(SOCKET_EVENTS.SESSION_END, sessionEnded);
+      socket.off(SOCKET_EVENTS.SESSION_PARTICIPANT_JOINED, participantJoined);
+      socket.off(SOCKET_EVENTS.SESSION_PARTICIPANT_DISCONNECTED, participantDisconnected);
+      socket.off(SOCKET_EVENTS.SESSION_PARTICIPANT_RECONNECTED, participantReconnected);
+      socket.off(SOCKET_EVENTS.SESSION_CALL_READY, callReady);
+      socket.off("connect", joinSession);
       socket.off("connect_error", connectError);
       stopMedia(socket);
     };

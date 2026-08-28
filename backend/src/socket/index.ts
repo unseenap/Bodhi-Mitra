@@ -20,6 +20,8 @@ import { createNotification, createNotificationForRole, setNotificationEmitter }
 type Ack = (result: { ok: boolean; message?: string }) => void;
 type SocketAuth = { id: string; role: "student" | "psychologist" | "admin" };
 const timers = new Map<string, NodeJS.Timeout>();
+const disconnectedPresence = new Map<string, string>();
+const joinedPresence = new Set<string>();
 
 function messageOf(error: unknown) {
   return error instanceof Error ? error.message : "The request could not be completed";
@@ -43,6 +45,16 @@ async function activeParticipant(sessionId: string, userId: string) {
     endedAt: { $exists: false },
     $or: [{ studentId: userId }, { psychologistId: userId }]
   }).select("+studentId");
+}
+
+function peerForSession(session: any, role: SocketAuth["role"]) {
+  if (role === "student") return { id: String(session.psychologistId), role: "psychologist" as const };
+  if (role === "psychologist") return { id: String(session.studentId), role: "student" as const };
+  return null;
+}
+
+function sessionActionUrl(role: "student" | "psychologist", sessionId: string) {
+  return `/${role}/session/${sessionId}`;
 }
 
 export function createSocketServer(httpServer: HttpServer) {
@@ -202,6 +214,30 @@ export function createSocketServer(httpServer: HttpServer) {
         const session = await activeParticipant(sessionId, id);
         if (!session) throw new Error("Active session not found");
         await socket.join(`session:${sessionId}`);
+        socket.data.activeSessionId = sessionId;
+        const peer = peerForSession(session, role);
+        if (peer) {
+          const presenceKey = `${sessionId}:${role}`;
+          const disconnectedToken = disconnectedPresence.get(presenceKey);
+          const isFirstJoin = !joinedPresence.has(presenceKey);
+          joinedPresence.add(presenceKey);
+          const event = disconnectedToken ? SOCKET_EVENTS.SESSION_PARTICIPANT_RECONNECTED : SOCKET_EVENTS.SESSION_PARTICIPANT_JOINED;
+          const type = disconnectedToken ? "session.connection.restored" : "session.participant.joined";
+          const title = disconnectedToken ? "Session connection restored" : role === "student" ? "Student joined" : "Psychologist joined";
+          const message = disconnectedToken
+            ? "The secure session connection has been restored."
+            : role === "student" ? "The student has joined the private session." : "Your psychologist has joined the private session.";
+          disconnectedPresence.delete(presenceKey);
+          if (disconnectedToken || isFirstJoin) {
+            io.to(`${peer.role}:${peer.id}`).emit(event, { sessionId, role });
+            await createNotification({
+              recipientId: peer.id, recipientRole: peer.role, type, title, message,
+              priority: disconnectedToken ? "normal" : "high", actionUrl: sessionActionUrl(peer.role, sessionId),
+              entityType: "Session", entityId: sessionId,
+              deduplicationKey: disconnectedToken ? `session-reconnected:${sessionId}:${role}:${disconnectedToken}` : `session-joined:${sessionId}:${role}`
+            });
+          }
+        }
         ack?.({ ok: true });
       } catch (error) {
         ack?.({ ok: false, message: messageOf(error) });
@@ -211,8 +247,19 @@ export function createSocketServer(httpServer: HttpServer) {
     socket.on(SOCKET_EVENTS.SESSION_READY, async (payload, ack?: Ack) => {
       try {
         const { sessionId } = sessionIdSchema.parse(payload);
-        if (!socket.rooms.has(`session:${sessionId}`) || !await activeParticipant(sessionId, id)) throw new Error("Active session not found");
+        const session = await activeParticipant(sessionId, id);
+        if (!socket.rooms.has(`session:${sessionId}`) || !session) throw new Error("Active session not found");
         socket.to(`session:${sessionId}`).emit(SOCKET_EVENTS.SESSION_READY, { role });
+        if (role === "psychologist" && session.mode !== "chat") {
+          const studentId = String(session.studentId);
+          io.to(`student:${studentId}`).emit(SOCKET_EVENTS.SESSION_CALL_READY, { sessionId, mode: session.mode });
+          await createNotification({
+            recipientId: studentId, recipientRole: "student", type: "session.call.incoming",
+            title: `Secure ${session.mode} call ready`, message: "Your psychologist is ready to connect securely.",
+            priority: "critical", actionUrl: `/student/session/${sessionId}`, entityType: "Session", entityId: sessionId,
+            channels: ["in_app", "socket", "push"], deduplicationKey: `session-call-ready:${sessionId}`
+          });
+        }
         ack?.({ ok: true });
       } catch (error) {
         ack?.({ ok: false, message: messageOf(error) });
@@ -252,6 +299,10 @@ export function createSocketServer(httpServer: HttpServer) {
         const session = await Session.findOneAndUpdate({ _id: candidate._id, endedAt: { $exists: false } }, { endedAt: new Date() }).select("+studentId");
         if (!session) throw new Error("Session has already ended");
         await EmergencyRequest.findByIdAndUpdate(session.requestId, { status: "ended" });
+        for (const participantRole of ["student", "psychologist"] as const) {
+          joinedPresence.delete(`${sessionId}:${participantRole}`);
+          disconnectedPresence.delete(`${sessionId}:${participantRole}`);
+        }
         io.to(`session:${sessionId}`).emit(SOCKET_EVENTS.SESSION_END, { sessionId });
         await Promise.allSettled([
           createNotification({
@@ -274,6 +325,32 @@ export function createSocketServer(httpServer: HttpServer) {
     });
 
     socket.on("disconnect", () => {
+      const activeSessionId = typeof socket.data.activeSessionId === "string" ? socket.data.activeSessionId : null;
+      if (activeSessionId && role !== "admin") {
+        setTimeout(async () => {
+          try {
+            const activeConnections = await io.in(`${role}:${id}`).fetchSockets();
+            const stillPresent = activeConnections.some(connection => connection.rooms.has(`session:${activeSessionId}`));
+            if (stillPresent) return;
+            const session = await activeParticipant(activeSessionId, id);
+            const peer = session ? peerForSession(session, role) : null;
+            if (!session || !peer) return;
+            const token = randomUUID();
+            joinedPresence.delete(`${activeSessionId}:${role}`);
+            disconnectedPresence.set(`${activeSessionId}:${role}`, token);
+            io.to(`${peer.role}:${peer.id}`).emit(SOCKET_EVENTS.SESSION_PARTICIPANT_DISCONNECTED, { sessionId: activeSessionId, role });
+            await createNotification({
+              recipientId: peer.id, recipientRole: peer.role, type: "session.participant.disconnected",
+              title: "Session connection interrupted", message: "The other participant disconnected. The session remains protected while they reconnect.",
+              priority: "high", actionUrl: sessionActionUrl(peer.role, activeSessionId), entityType: "Session", entityId: activeSessionId,
+              deduplicationKey: `session-disconnected:${activeSessionId}:${role}:${token}`,
+              expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+            });
+          } catch (error) {
+            console.error("Session presence update failed", error);
+          }
+        }, 1_000).unref();
+      }
       if (role !== "psychologist") return;
       setTimeout(async () => {
         const connections = await io.in(`psychologist:${id}`).fetchSockets();

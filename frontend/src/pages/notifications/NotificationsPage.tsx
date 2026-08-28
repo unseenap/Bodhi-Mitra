@@ -87,7 +87,7 @@ export function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
-  const { markRead, markAllRead, unread } = useNotificationCenter();
+  const { markRead, acknowledge, markAllRead, unread } = useNotificationCenter();
   const navigate = useNavigate();
 
   async function load(reset = true) {
@@ -111,10 +111,13 @@ export function NotificationsPage() {
   useEffect(() => { void load(true); }, [filter]);
 
   async function openItem(notification: AppNotification) {
-    if (!notification.readAt) {
+    const needsAcknowledgement = (notification.priority === "critical" || notification.priority === "high") && !notification.acknowledgedAt;
+    if (!notification.readAt || needsAcknowledgement) {
       try {
-        await markRead(notification.id);
-        setNotifications(items => items.map(item => item.id === notification.id ? { ...item, readAt: new Date().toISOString() } : item));
+        const now = new Date().toISOString();
+        if (needsAcknowledgement) await acknowledge(notification.id);
+        else await markRead(notification.id);
+        setNotifications(items => items.map(item => item.id === notification.id ? { ...item, readAt: item.readAt ?? now, ...(needsAcknowledgement ? { acknowledgedAt: now } : {}) } : item));
       } catch { return; }
     }
     if (notification.actionUrl) navigate(notification.actionUrl);

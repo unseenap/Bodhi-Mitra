@@ -27,7 +27,7 @@ function NotificationItem({ notification, onOpen }: { notification: AppNotificat
 }
 
 export function NotificationBell({ mobile = false }: { mobile?: boolean }) {
-  const { notifications, unread, loading, error, markRead, markAllRead } = useNotificationCenter();
+  const { notifications, unread, loading, error, markRead, acknowledge, markAllRead } = useNotificationCenter();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -47,7 +47,10 @@ export function NotificationBell({ mobile = false }: { mobile?: boolean }) {
   }, [open]);
 
   async function openNotification(notification: AppNotification) {
-    try { await markRead(notification.id); } catch { /* The shared context restores server state. */ }
+    try {
+      if (notification.priority === "critical" || notification.priority === "high") await acknowledge(notification.id);
+      else await markRead(notification.id);
+    } catch { /* The shared context restores server state. */ }
     setOpen(false);
     if (notification.actionUrl) navigate(notification.actionUrl);
   }

@@ -88,5 +88,9 @@ export const SOCKET_EVENTS = {
   EMERGENCY_ACCEPT: "emergency:accept", EMERGENCY_TAKEN: "emergency:taken", EMERGENCY_CANCEL: "emergency:cancel",
   EMERGENCY_TIMEOUT: "emergency:timeout", SESSION_MATCHED: "session:matched", SESSION_JOIN: "session:join",
   SESSION_READY: "session:ready", SESSION_MESSAGE: "session:message", SESSION_SIGNAL: "session:signal",
+  SESSION_PARTICIPANT_JOINED: "session:participant:joined",
+  SESSION_PARTICIPANT_DISCONNECTED: "session:participant:disconnected",
+  SESSION_PARTICIPANT_RECONNECTED: "session:participant:reconnected",
+  SESSION_CALL_READY: "session:call:ready",
   SESSION_END: "session:end", ERROR: "app:error"
 } as const;

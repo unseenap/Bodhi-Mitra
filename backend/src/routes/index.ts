@@ -9,6 +9,7 @@ import { psychologistProfile, psychologistSummary, setAvailability } from "../co
 import { adminAssessments, assessmentStatus, submitAssessment } from "../controllers/assessment.controller.js";
 import {
   getNotificationPreferences,
+  acknowledgeNotification,
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
@@ -34,6 +35,7 @@ const notificationMutationLimit = rateLimit({ windowMs: 60 * 1000, limit: 60, st
 api.get("/notifications", requireAuth(), listNotifications);
 api.get("/notifications/unread-count", requireAuth(), unreadNotificationCount);
 api.patch("/notifications/:notificationId/read", notificationMutationLimit, requireAuth(), markNotificationRead);
+api.patch("/notifications/:notificationId/acknowledge", notificationMutationLimit, requireAuth(), acknowledgeNotification);
 api.post("/notifications/mark-all-read", notificationMutationLimit, requireAuth(), markAllNotificationsRead);
 api.get("/notifications/preferences", requireAuth(), getNotificationPreferences);
 api.patch("/notifications/preferences", notificationMutationLimit, requireAuth(), updateNotificationPreferences);

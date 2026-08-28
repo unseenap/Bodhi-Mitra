@@ -87,6 +87,23 @@ export async function markNotificationRead(req: Request, res: Response) {
   res.json({ notification: toSafeNotification(notification) });
 }
 
+export async function acknowledgeNotification(req: Request, res: Response) {
+  const notificationId = idSchema.parse(req.params.notificationId);
+  const now = new Date();
+  const notification = await Notification.findOneAndUpdate(
+    {
+      _id: notificationId,
+      recipientId: req.auth!.id,
+      recipientRole: req.auth!.role,
+      priority: { $in: ["critical", "high"] }
+    },
+    { $set: { readAt: now, acknowledgedAt: now } },
+    { new: true }
+  );
+  if (!notification) return res.status(404).json({ message: "Actionable notification not found" });
+  res.json({ notification: toSafeNotification(notification) });
+}
+
 export async function markAllNotificationsRead(req: Request, res: Response) {
   const result = await Notification.updateMany(
     { recipientId: req.auth!.id, recipientRole: req.auth!.role, readAt: { $exists: false } },
