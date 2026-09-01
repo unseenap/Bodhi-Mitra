@@ -22,6 +22,7 @@ coverage/
 # Local product planning documents
 /notification-plan.md
 
-# Local SQL schemas, seeds, migrations, and MySQL planning files
+# Ignore SQL exports and local database support files, but keep the canonical schema
 *.sql
-/backend/database/mysql/
+/backend/database/mysql/*
+!/backend/database/mysql/schema.sql
