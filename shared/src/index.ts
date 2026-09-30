@@ -46,7 +46,7 @@ export const emergencyRequestSchema = z.object({
   mood: z.enum(emergencyMoods).optional(),
   urgent: z.boolean().optional().default(false)
 });
-export const emergencyIdSchema = z.object({ requestId: z.string().regex(/^[a-f\d]{24}$/i) }).strict();
+export const emergencyIdSchema = z.object({ requestId: z.string().refine(value => /^[a-f\d]{24}$/i.test(value) || z.string().uuid().safeParse(value).success, "Invalid emergency request identifier") }).strict();
 export const sessionIdSchema = z.object({ sessionId: z.string().uuid() }).strict();
 export const sessionMessageSchema = z.object({
   sessionId: z.string().uuid(),

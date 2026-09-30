@@ -16,6 +16,7 @@ import { ContentPage, ExpertsPage, FaqPage, NotFoundPage } from "./pages/public/
 import { EmergencyPage } from "./pages/public/EmergencyPage";
 import { HomePage } from "./pages/public/HomePage";
 import { QuickConnectPage } from "./pages/public/QuickConnectPage";
+import { TextPage } from "./pages/public/TextPage";
 import { AssessmentPage } from "./pages/student/AssessmentPage";
 import { StudentOverview, StudentProfile } from "./pages/student/StudentPages";
 import { StudentResources } from "./pages/student/StudentResourcesPage";
@@ -37,6 +38,7 @@ export default function App() {
       <Route path="privacy" element={<ContentPage kind="privacy" />} />
       <Route path="faq" element={<FaqPage />} />
       <Route path="experts" element={<ExpertsPage />} />
+      <Route path="text" element={<TextPage />} />
       <Route path="assessment" element={<Navigate to="/student/assessment" replace />} />
       <Route path="assesment" element={<Navigate to="/student/assessment" replace />} />
     </Route>

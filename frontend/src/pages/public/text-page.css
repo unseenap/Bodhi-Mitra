@@ -1,0 +1,1 @@
+.text-page{height:calc(100dvh - 64px);min-height:440px;background:#09090f;font-family:Manrope,sans-serif;overflow:hidden}.global-nav--shrunk~main .text-page{height:calc(100dvh - 56px)}@media(max-width:700px){.text-page{min-height:380px}}

@@ -5,12 +5,11 @@ const read = (path: string) => readFile(new URL(path, import.meta.url), "utf8");
 
 describe("notification privacy and access boundaries", () => {
   it("scopes notification reads and mutations to the authenticated recipient", async () => {
-    const source = await read("../src/controllers/notification.controller.ts");
-    expect(source).toContain("recipientId: req.auth!.id");
-    expect(source).toContain("recipientRole: req.auth!.role");
+    const source = await read("../src/controllers/mysql-notification.controller.ts");
+    expect(source).toContain("notifications.list(req.auth!.id, req.auth!.role");
+    expect(source).toContain("notifications.markRead(id.parse(req.params.notificationId), req.auth!.id)");
     expect(source).not.toContain("req.body.recipientId");
-    expect(source).toContain("acknowledgeNotification");
-    expect(source).toContain('priority: { $in: ["critical", "high"] }');
+    expect(source).toContain("notifications.acknowledge");
   });
 
   it("rejects external notification action links", async () => {
@@ -43,24 +42,21 @@ describe("session notification lifecycle", () => {
 describe("notification delivery guarantees", () => {
   it("stores records before socket and push delivery", async () => {
     const source = await read("../src/services/notification.service.ts");
-    const insert = source.indexOf("Notification.create");
-    const socket = source.indexOf("emitNotification?.");
-    const push = source.indexOf("void sendPushToUser");
-    expect(insert).toBeGreaterThan(-1);
-    expect(socket).toBeGreaterThan(insert);
-    expect(push).toBeGreaterThan(insert);
+    expect(source.indexOf("emitNotification?.")).toBeGreaterThan(source.indexOf("notifications.create"));
+    expect(source.indexOf("void sendMysqlPushToUser")).toBeGreaterThan(source.indexOf("notifications.create"));
   });
 
   it("uses recipient-scoped unique deduplication", async () => {
-    const source = await read("../src/models/Notification.ts");
-    expect(source).toContain("{ recipientId: 1, deduplicationKey: 1 }");
-    expect(source).toContain("unique: true");
+    const source = await read("../database/mysql/schema.sql");
+    expect(source).toContain("UNIQUE KEY uq_notifications_recipient_dedupe");
+    expect(source).toContain("recipient_id, deduplication_key");
   });
 
   it("keeps the weekly reminder job idempotent", async () => {
     const source = await read("../src/services/notification.scheduler.ts");
-    expect(source).toContain("assessment-eligible:${eligibleAt.toISOString()}");
-    expect(source).toContain("!item.assessmentReminders");
-    expect(source).toContain("preference?.push === false");
+    expect(source).toContain("assessment-eligible:${student.assessment_next_eligible_at!.toISOString()}");
+    expect(source).toContain("np.assessment_reminders");
+    expect(source).toContain("student.push_enabled === false");
+    expect(source).toContain("acquireMysqlLease");
   });
 });

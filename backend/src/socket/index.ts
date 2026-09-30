@@ -10,18 +10,20 @@ import {
   SOCKET_EVENTS
 } from "@bodhi/shared";
 import { env } from "../config/env.js";
-import { EmergencyRequest } from "../models/EmergencyRequest.js";
-import { Session } from "../models/Session.js";
-import { User } from "../models/User.js";
-import { acceptEmergency, createEmergency, expireEmergency, hotlines } from "../services/emergency.service.js";
 import { verifyToken } from "../utils/auth.js";
 import { createNotification, createNotificationForRole, setNotificationEmitter } from "../services/notification.service.js";
+import { getMysqlDatabase } from "../database/client.js";
+import { MysqlPsychologistRepository, MysqlSessionRepository, MysqlUserRepository } from "../repositories/mysql/index.js";
+import { acceptMysqlEmergency, cancelMysqlEmergency, createMysqlEmergency, endMysqlSession, expireMysqlEmergency, hotlines } from "../services/mysql-emergency.service.js";
 
 type Ack = (result: { ok: boolean; message?: string }) => void;
 type SocketAuth = { id: string; role: "student" | "psychologist" | "admin" };
 const timers = new Map<string, NodeJS.Timeout>();
 const disconnectedPresence = new Map<string, string>();
 const joinedPresence = new Set<string>();
+const mysqlSessions = new MysqlSessionRepository();
+const mysqlPsychologists = new MysqlPsychologistRepository();
+const mysqlUsers = new MysqlUserRepository();
 
 function messageOf(error: unknown) {
   return error instanceof Error ? error.message : "The request could not be completed";
@@ -40,11 +42,8 @@ function socketRateLimit(socket: Socket, key: string, limit: number, windowMs: n
 }
 
 async function activeParticipant(sessionId: string, userId: string) {
-  return Session.findOne({
-    sessionId,
-    endedAt: { $exists: false },
-    $or: [{ studentId: userId }, { psychologistId: userId }]
-  }).select("+studentId");
+  const row = await mysqlSessions.findParticipant(sessionId, userId, true);
+  return row ? { ...row, sessionId: row.id } : null;
 }
 
 function peerForSession(session: any, role: SocketAuth["role"]) {
@@ -71,8 +70,8 @@ export function createSocketServer(httpServer: HttpServer) {
     try {
       const token = typeof socket.handshake.auth.token === "string" ? socket.handshake.auth.token : "";
       const claims = verifyToken(token);
-      const user = await User.findOne({ _id: claims.sub, role: claims.role, isActive: true, verified: true }).select("role").lean();
-      if (!user) return next(new Error("Authentication required"));
+      const user = await mysqlUsers.findByUuid(claims.sub);
+      if (!user || !user.isActive || !user.verified || user.role !== claims.role) return next(new Error("Authentication required"));
       socket.data.auth = { id: claims.sub, role: user.role } satisfies SocketAuth;
       next();
     } catch {
@@ -81,7 +80,7 @@ export function createSocketServer(httpServer: HttpServer) {
   });
 
   async function expireAndNotify(requestId: string) {
-    const expired = await expireEmergency(requestId);
+    const expired = await expireMysqlEmergency(requestId);
     if (!expired) return;
     io.to(`student:${String(expired.studentId)}`).emit(SOCKET_EVENTS.EMERGENCY_TIMEOUT, { hotlines });
     io.to("psychologists").emit(SOCKET_EVENTS.EMERGENCY_TAKEN, { requestId });
@@ -105,8 +104,8 @@ export function createSocketServer(httpServer: HttpServer) {
   // source of truth, so duplicate workers cannot expire the same request twice.
   const sweep = setInterval(async () => {
     try {
-      const overdue = await EmergencyRequest.find({ status: "pending", timeoutAt: { $lte: new Date() } }).select("_id").limit(100).lean();
-      await Promise.all(overdue.map(request => expireAndNotify(String(request._id))));
+      const overdue = await getMysqlDatabase().selectFrom("emergency_requests").select("request_uuid").where("status", "=", "pending").where("timeout_at", "<=", new Date()).limit(100).execute();
+      await Promise.all(overdue.map(request => expireAndNotify(request.request_uuid)));
     } catch (error) {
       console.error("Emergency timeout sweep failed", error);
     }
@@ -118,7 +117,7 @@ export function createSocketServer(httpServer: HttpServer) {
     socket.join(`${role}:${id}`);
     if (role === "psychologist") {
       socket.join("psychologists");
-      await User.findByIdAndUpdate(id, { isOnline: true });
+      await mysqlPsychologists.setPresence(id, true);
     }
 
     socket.on(SOCKET_EVENTS.EMERGENCY_REQUEST, async (payload, ack?: Ack) => {
@@ -126,7 +125,7 @@ export function createSocketServer(httpServer: HttpServer) {
         if (role !== "student") throw new Error("Student access required");
         if (!socketRateLimit(socket, "emergency-request", 3, 60_000)) throw new Error("Please wait before sending another emergency request");
         const { mode, mood, urgent } = emergencyRequestSchema.strict().parse(payload);
-        const request = await createEmergency(id, mode, { mood, urgent });
+        const request = await createMysqlEmergency(id, mode, { mood, urgent });
         const safe = { requestId: request.id, anonId: request.anonId, mode: request.mode, mood: request.mood, urgent: request.urgent, waitStartedAt: request.createdAt.toISOString() };
         socket.emit(SOCKET_EVENTS.EMERGENCY_QUEUED, safe);
         io.to("psychologists").emit(SOCKET_EVENTS.EMERGENCY_NEW, safe);
@@ -161,7 +160,7 @@ export function createSocketServer(httpServer: HttpServer) {
         if (role !== "psychologist") throw new Error("Psychologist access required");
         if (!socketRateLimit(socket, "emergency-accept", 20, 60_000)) throw new Error("Too many acceptance attempts. Please wait a moment");
         const { requestId } = emergencyIdSchema.parse(payload);
-        const result = await acceptEmergency(requestId, id);
+        const result = await acceptMysqlEmergency(requestId, id);
         if (!result) return ack?.({ ok: false, message: "This request was already taken or expired" });
         const timer = timers.get(requestId);
         if (timer) clearTimeout(timer);
@@ -194,10 +193,7 @@ export function createSocketServer(httpServer: HttpServer) {
       try {
         if (role !== "student") throw new Error("Student access required");
         const { requestId } = emergencyIdSchema.parse(payload);
-        const cancelled = await EmergencyRequest.findOneAndUpdate(
-          { _id: requestId, studentId: id, status: "pending" },
-          { status: "cancelled" }
-        );
+        const cancelled = await cancelMysqlEmergency(requestId, id);
         const timer = timers.get(requestId);
         if (timer) clearTimeout(timer);
         timers.delete(requestId);
@@ -296,9 +292,8 @@ export function createSocketServer(httpServer: HttpServer) {
         const { sessionId } = sessionIdSchema.parse(payload);
         const candidate = await activeParticipant(sessionId, id);
         if (!candidate) throw new Error("Active session not found");
-        const session = await Session.findOneAndUpdate({ _id: candidate._id, endedAt: { $exists: false } }, { endedAt: new Date() }).select("+studentId");
+        const session = await endMysqlSession(sessionId, id);
         if (!session) throw new Error("Session has already ended");
-        await EmergencyRequest.findByIdAndUpdate(session.requestId, { status: "ended" });
         for (const participantRole of ["student", "psychologist"] as const) {
           joinedPresence.delete(`${sessionId}:${participantRole}`);
           disconnectedPresence.delete(`${sessionId}:${participantRole}`);
@@ -354,7 +349,7 @@ export function createSocketServer(httpServer: HttpServer) {
       if (role !== "psychologist") return;
       setTimeout(async () => {
         const connections = await io.in(`psychologist:${id}`).fetchSockets();
-        if (!connections.length) await User.findByIdAndUpdate(id, { isOnline: false });
+        if (!connections.length) await mysqlPsychologists.setPresence(id, false);
       }, 250).unref();
     });
   });

@@ -1,39 +1,44 @@
-import { NotificationPreference } from "../models/NotificationPreference.js";
-import { User } from "../models/User.js";
 import { createNotification } from "./notification.service.js";
+import { getMysqlDatabase } from "../database/client.js";
+import { randomUUID } from "node:crypto";
+import { sql } from "kysely";
 
 const HOUR_MS = 60 * 60 * 1000;
 let timer: NodeJS.Timeout | null = null;
+const schedulerOwner = randomUUID();
+
+async function acquireMysqlLease(now: Date) {
+  const db = getMysqlDatabase(); const expires = new Date(now.getTime() + 10 * 60_000);
+  await sql`INSERT INTO scheduler_leases (lease_name, owner_uuid, acquired_at, heartbeat_at, expires_at)
+    VALUES ('notification-hourly', ${schedulerOwner}, ${now}, ${now}, ${expires})
+    ON DUPLICATE KEY UPDATE
+      owner_uuid = IF(expires_at <= VALUES(acquired_at) OR owner_uuid = VALUES(owner_uuid), VALUES(owner_uuid), owner_uuid),
+      acquired_at = IF(expires_at <= VALUES(acquired_at), VALUES(acquired_at), acquired_at),
+      heartbeat_at = IF(expires_at <= VALUES(heartbeat_at) OR owner_uuid = VALUES(owner_uuid), VALUES(heartbeat_at), heartbeat_at),
+      expires_at = IF(expires_at <= VALUES(heartbeat_at) OR owner_uuid = VALUES(owner_uuid), VALUES(expires_at), expires_at)`.execute(db);
+  return Boolean(await db.selectFrom("scheduler_leases").select("lease_name").where("lease_name", "=", "notification-hourly").where("owner_uuid", "=", schedulerOwner).executeTakeFirst());
+}
+
+async function runMysqlNotificationJobs(now: Date) {
+  if (!await acquireMysqlLease(now)) return { assessmentEligibility: { scanned: 0, failed: 0 }, leaseAcquired: false };
+  const db = getMysqlDatabase();
+  const rows = await db.selectFrom("users as u").innerJoin("student_profiles as p", "p.user_id", "u.id").leftJoin("notification_preferences as np", "np.user_id", "u.id")
+    .select(["u.user_uuid", "p.assessment_next_eligible_at", "np.assessment_reminders", "np.push_enabled"])
+    .where("u.role", "=", "student").where("u.verified", "=", true).where("u.is_active", "=", true)
+    .where("p.assessment_next_eligible_at", "<=", now).where(eb => eb.or([eb("np.assessment_reminders", "is", null), eb("np.assessment_reminders", "=", true)])).limit(500).execute();
+  const results = await Promise.allSettled(rows.map(student => createNotification({
+    recipientId: student.user_uuid, recipientRole: "student", type: "assessment.eligible",
+    title: "Your weekly check-in is ready", message: "Take a few private minutes to reflect on how you have been feeling.", priority: "low",
+    actionUrl: "/student/assessment", entityType: "AssessmentEligibility", entityId: student.assessment_next_eligible_at!.toISOString(),
+    channels: student.push_enabled === false ? ["in_app", "socket"] : ["in_app", "socket", "push"],
+    deduplicationKey: `assessment-eligible:${student.assessment_next_eligible_at!.toISOString()}`,
+    expiresAt: new Date(student.assessment_next_eligible_at!.getTime() + 7 * 24 * HOUR_MS),
+  })));
+  return { assessmentEligibility: { scanned: rows.length, failed: results.filter(x => x.status === "rejected").length }, leaseAcquired: true };
+}
 
 export async function runNotificationJobs(now = new Date()) {
-  const preferences = await NotificationPreference.find().select("userId assessmentReminders push").lean();
-  const disabledIds = preferences.filter(item => !item.assessmentReminders).map(item => item.userId);
-  const preferencesByUser = new Map(preferences.map(item => [String(item.userId), item]));
-  const students = await User.find({
-    role: "student", verified: true, isActive: true,
-    assessmentNextEligibleAt: { $lte: now },
-    ...(disabledIds.length ? { _id: { $nin: disabledIds } } : {})
-  }).select("+assessmentNextEligibleAt").limit(500);
-
-  const results = await Promise.allSettled(students.map(student => {
-    const eligibleAt = student.assessmentNextEligibleAt!;
-    const preference = preferencesByUser.get(student.id);
-    return createNotification({
-      recipientId: student.id,
-      recipientRole: "student",
-      type: "assessment.eligible",
-      title: "Your weekly check-in is ready",
-      message: "Take a few private minutes to reflect on how you have been feeling.",
-      priority: "low",
-      actionUrl: "/student/assessment",
-      entityType: "AssessmentEligibility",
-      entityId: eligibleAt.toISOString(),
-      channels: preference?.push === false ? ["in_app", "socket"] : ["in_app", "socket", "push"],
-      deduplicationKey: `assessment-eligible:${eligibleAt.toISOString()}`,
-      expiresAt: new Date(eligibleAt.getTime() + 7 * 24 * HOUR_MS)
-    });
-  }));
-  return { assessmentEligibility: { scanned: students.length, failed: results.filter(item => item.status === "rejected").length } };
+  return runMysqlNotificationJobs(now);
 }
 
 export function startNotificationScheduler() {

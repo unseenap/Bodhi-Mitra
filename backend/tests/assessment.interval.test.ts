@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ASSESSMENT_INTERVAL_MS, nextEligibleFrom } from "../src/controllers/assessment.controller.js";
+import { ASSESSMENT_INTERVAL_MS, nextEligibleFrom } from "../src/controllers/mysql-assessment.controller.js";
 
 describe("weekly assessment eligibility", () => {
   it("unlocks exactly seven days after completion", () => {

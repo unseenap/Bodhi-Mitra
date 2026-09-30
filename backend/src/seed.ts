@@ -1,8 +1,15 @@
+import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
-import mongoose from "mongoose";
 import { env } from "./config/env.js";
-import { User } from "./models/User.js";
-await mongoose.connect(env.MONGODB_URI);
+import { destroyMysql, initializeMysql } from "./database/client.js";
+
 const passwordHash = await bcrypt.hash(env.ADMIN_PASSWORD, 12);
-await User.findOneAndUpdate({ email: env.ADMIN_EMAIL }, { role: "admin", email: env.ADMIN_EMAIL, passwordHash, verified: true, isActive: true }, { upsert: true });
-console.info(`Admin account ready: ${env.ADMIN_EMAIL}`); await mongoose.disconnect();
+const db = await initializeMysql();
+await db.insertInto("users").values({
+    user_uuid: randomUUID(), role: "admin", full_name: "Bodhi-Mitra Administrator",
+    email: env.ADMIN_EMAIL.toLowerCase(), password_hash: passwordHash,
+    otp_hash: null, otp_expires_at: null, otp_attempts: 0,
+    verified: true, is_active: true, must_change_password: true,
+}).onDuplicateKeyUpdate({ password_hash: passwordHash, verified: true, is_active: true, must_change_password: true }).executeTakeFirst();
+console.info(`Admin account ready: ${env.ADMIN_EMAIL}`);
+await destroyMysql();

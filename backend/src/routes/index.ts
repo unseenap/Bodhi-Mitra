@@ -1,69 +1,70 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import { changePassword, me, passwordLogin, registerStudent, requestOtp, requestStudentPasswordReset, resetStudentPassword, verifyOtp } from "../controllers/auth.controller.js";
-import { activeStudentEmergency, createPsychologist, experts, listPsychologists, metrics, psychologistQueue, sessionHistory, studentHistory, subscribePush, updatePsychologist } from "../controllers/data.controller.js";
-import { requireAuth } from "../middleware/auth.js";
-import { adminAnalytics, adminReports, adminSessions, adminStudents, resolveReport } from "../controllers/admin.controller.js";
-import { escalateSession, rateSession, sessionDetails, sessionIceConfiguration } from "../controllers/session.controller.js";
-import { psychologistProfile, psychologistSummary, setAvailability } from "../controllers/psychologist.controller.js";
-import { adminAssessments, assessmentStatus, submitAssessment } from "../controllers/assessment.controller.js";
-import {
-  getNotificationPreferences,
-  acknowledgeNotification,
-  listNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
-  subscribeNotificationPush,
-  unreadNotificationCount,
-  unsubscribeNotificationPush,
-  updateNotificationPreferences
-} from "../controllers/notification.controller.js";
+import { checkMysqlHealth } from "../database/health.js";
+import { mysqlChangePassword, mysqlMe, mysqlPasswordLogin, mysqlRegisterStudent, mysqlRequestOtp, mysqlRequestPasswordReset, mysqlResetPassword, mysqlVerifyOtp } from "../controllers/mysql-auth.controller.js";
+import { requireMysqlAuth } from "../middleware/mysql-auth.js";
+import { mysqlCreatePsychologist, mysqlExperts, mysqlListPsychologists, mysqlUpdatePsychologist } from "../controllers/mysql-psychologist.controller.js";
+import { mysqlActiveStudentEmergency, mysqlMetrics, mysqlPsychologistProfile, mysqlPsychologistQueue, mysqlPsychologistSummary, mysqlSessionHistory, mysqlSetAvailability, mysqlStudentHistory, mysqlSubscribePush } from "../controllers/mysql-data.controller.js";
+import { mysqlEscalateSession, mysqlRateSession, mysqlSessionDetails, mysqlSessionIceConfiguration } from "../controllers/mysql-session.controller.js";
+import { mysqlAdminAssessments, mysqlAssessmentStatus, mysqlSubmitAssessment } from "../controllers/mysql-assessment.controller.js";
+import { mysqlAdminAnalytics, mysqlAdminReports, mysqlAdminSessions, mysqlAdminStudents, mysqlResolveReport } from "../controllers/mysql-admin.controller.js";
+import { mysqlAcknowledgeNotification, mysqlGetNotificationPreferences, mysqlListNotifications, mysqlMarkAllNotificationsRead, mysqlMarkNotificationRead, mysqlSubscribeNotificationPush, mysqlUnreadNotificationCount, mysqlUnsubscribeNotificationPush, mysqlUpdateNotificationPreferences } from "../controllers/mysql-notification.controller.js";
 
 export const api = Router();
 const otpLimit = rateLimit({ windowMs: 10 * 60 * 1000, limit: 3, standardHeaders: true, legacyHeaders: false, message: { message: "Too many code requests. Please wait before trying again" } });
 const otpVerifyLimit = rateLimit({ windowMs: 10 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false, message: { message: "Too many verification attempts. Please wait before trying again" } });
-api.get("/health", (_req, res) => res.json({ status: "ok" }));
-api.post("/auth/student/register", otpLimit, registerStudent);
-api.post("/auth/student/request-otp", otpLimit, requestOtp);
-api.post("/auth/student/verify-otp", otpVerifyLimit, verifyOtp);
-api.post("/auth/student/forgot-password", otpLimit, requestStudentPasswordReset);
-api.post("/auth/student/reset-password", otpVerifyLimit, resetStudentPassword);
-api.post("/auth/login", rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { message: "Too many failed sign-in attempts. Please wait before trying again" } }), passwordLogin);
-api.get("/auth/me", requireAuth(), me);
-api.post("/auth/change-password", requireAuth(["psychologist", "admin"]), changePassword);
+const loginLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { message: "Too many failed sign-in attempts. Please wait before trying again" } });
 const notificationMutationLimit = rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false });
-api.get("/notifications", requireAuth(), listNotifications);
-api.get("/notifications/unread-count", requireAuth(), unreadNotificationCount);
-api.patch("/notifications/:notificationId/read", notificationMutationLimit, requireAuth(), markNotificationRead);
-api.patch("/notifications/:notificationId/acknowledge", notificationMutationLimit, requireAuth(), acknowledgeNotification);
-api.post("/notifications/mark-all-read", notificationMutationLimit, requireAuth(), markAllNotificationsRead);
-api.get("/notifications/preferences", requireAuth(), getNotificationPreferences);
-api.patch("/notifications/preferences", notificationMutationLimit, requireAuth(), updateNotificationPreferences);
-api.post("/notifications/push-subscription", notificationMutationLimit, requireAuth(), subscribeNotificationPush);
-api.delete("/notifications/push-subscription", notificationMutationLimit, requireAuth(), unsubscribeNotificationPush);
-api.get("/experts", experts);
-api.get("/student/history", requireAuth(["student"]), studentHistory);
-api.get("/student/emergency/active", requireAuth(["student"]), activeStudentEmergency);
-api.get("/student/assessment", requireAuth(["student"]), assessmentStatus);
-api.post("/student/assessment", requireAuth(["student"]), submitAssessment);
-api.get("/psychologist/queue", requireAuth(["psychologist"]), psychologistQueue);
-api.get("/psychologist/sessions", requireAuth(["psychologist"]), sessionHistory);
-api.get("/psychologist/summary", requireAuth(["psychologist"]), psychologistSummary);
-api.get("/psychologist/profile", requireAuth(["psychologist"]), psychologistProfile);
-api.patch("/psychologist/availability", requireAuth(["psychologist"]), setAvailability);
-api.post("/psychologist/push-subscription", requireAuth(["psychologist"]), subscribePush);
-api.get("/admin/psychologists", requireAuth(["admin"]), listPsychologists);
-api.post("/admin/psychologists", requireAuth(["admin"]), createPsychologist);
-api.patch("/admin/psychologists/:id", requireAuth(["admin"]), updatePsychologist);
-api.get("/admin/metrics", requireAuth(["admin"]), metrics);
-api.get("/admin/analytics", requireAuth(["admin"]), adminAnalytics);
-api.get("/admin/students", requireAuth(["admin"]), adminStudents);
-api.get("/admin/sessions", requireAuth(["admin"]), adminSessions);
-api.get("/admin/reports", requireAuth(["admin"]), adminReports);
-api.get("/admin/assessments", requireAuth(["admin"]), adminAssessments);
-api.patch("/admin/reports/:id/resolve", requireAuth(["admin"]), resolveReport);
 const sessionActionLimit = rateLimit({ windowMs: 5 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false });
-api.get("/sessions/:sessionId", requireAuth(["student", "psychologist"]), sessionDetails);
-api.get("/sessions/:sessionId/ice-config", sessionActionLimit, requireAuth(["student", "psychologist"]), sessionIceConfiguration);
-api.post("/sessions/:sessionId/rating", sessionActionLimit, requireAuth(["student"]), rateSession);
-api.post("/sessions/:sessionId/escalate", sessionActionLimit, requireAuth(["student", "psychologist"]), escalateSession);
+
+api.get("/health", async (_req, res) => {
+  const mysql = await checkMysqlHealth(); const ready = mysql.status === "ok";
+  res.status(ready ? 200 : 503).json({ status: ready ? "ok" : "degraded", activeDatastore: "mysql", databases: { mysql } });
+});
+
+api.post("/auth/student/register", otpLimit, mysqlRegisterStudent);
+api.post("/auth/student/request-otp", otpLimit, mysqlRequestOtp);
+api.post("/auth/student/verify-otp", otpVerifyLimit, mysqlVerifyOtp);
+api.post("/auth/student/forgot-password", otpLimit, mysqlRequestPasswordReset);
+api.post("/auth/student/reset-password", otpVerifyLimit, mysqlResetPassword);
+api.post("/auth/login", loginLimit, mysqlPasswordLogin);
+api.get("/auth/me", requireMysqlAuth(), mysqlMe);
+api.post("/auth/change-password", requireMysqlAuth(["psychologist", "admin"]), mysqlChangePassword);
+
+api.get("/notifications", requireMysqlAuth(), mysqlListNotifications);
+api.get("/notifications/unread-count", requireMysqlAuth(), mysqlUnreadNotificationCount);
+api.patch("/notifications/:notificationId/read", notificationMutationLimit, requireMysqlAuth(), mysqlMarkNotificationRead);
+api.patch("/notifications/:notificationId/acknowledge", notificationMutationLimit, requireMysqlAuth(), mysqlAcknowledgeNotification);
+api.post("/notifications/mark-all-read", notificationMutationLimit, requireMysqlAuth(), mysqlMarkAllNotificationsRead);
+api.get("/notifications/preferences", requireMysqlAuth(), mysqlGetNotificationPreferences);
+api.patch("/notifications/preferences", notificationMutationLimit, requireMysqlAuth(), mysqlUpdateNotificationPreferences);
+api.post("/notifications/push-subscription", notificationMutationLimit, requireMysqlAuth(), mysqlSubscribeNotificationPush);
+api.delete("/notifications/push-subscription", notificationMutationLimit, requireMysqlAuth(), mysqlUnsubscribeNotificationPush);
+
+api.get("/experts", mysqlExperts);
+api.get("/student/history", requireMysqlAuth(["student"]), mysqlStudentHistory);
+api.get("/student/emergency/active", requireMysqlAuth(["student"]), mysqlActiveStudentEmergency);
+api.get("/student/assessment", requireMysqlAuth(["student"]), mysqlAssessmentStatus);
+api.post("/student/assessment", requireMysqlAuth(["student"]), mysqlSubmitAssessment);
+api.get("/psychologist/queue", requireMysqlAuth(["psychologist"]), mysqlPsychologistQueue);
+api.get("/psychologist/sessions", requireMysqlAuth(["psychologist"]), mysqlSessionHistory);
+api.get("/psychologist/summary", requireMysqlAuth(["psychologist"]), mysqlPsychologistSummary);
+api.get("/psychologist/profile", requireMysqlAuth(["psychologist"]), mysqlPsychologistProfile);
+api.patch("/psychologist/availability", requireMysqlAuth(["psychologist"]), mysqlSetAvailability);
+api.post("/psychologist/push-subscription", requireMysqlAuth(["psychologist"]), mysqlSubscribePush);
+
+api.get("/admin/psychologists", requireMysqlAuth(["admin"]), mysqlListPsychologists);
+api.post("/admin/psychologists", requireMysqlAuth(["admin"]), mysqlCreatePsychologist);
+api.patch("/admin/psychologists/:id", requireMysqlAuth(["admin"]), mysqlUpdatePsychologist);
+api.get("/admin/metrics", requireMysqlAuth(["admin"]), mysqlMetrics);
+api.get("/admin/analytics", requireMysqlAuth(["admin"]), mysqlAdminAnalytics);
+api.get("/admin/students", requireMysqlAuth(["admin"]), mysqlAdminStudents);
+api.get("/admin/sessions", requireMysqlAuth(["admin"]), mysqlAdminSessions);
+api.get("/admin/reports", requireMysqlAuth(["admin"]), mysqlAdminReports);
+api.get("/admin/assessments", requireMysqlAuth(["admin"]), mysqlAdminAssessments);
+api.patch("/admin/reports/:id/resolve", requireMysqlAuth(["admin"]), mysqlResolveReport);
+
+api.get("/sessions/:sessionId", requireMysqlAuth(["student", "psychologist"]), mysqlSessionDetails);
+api.get("/sessions/:sessionId/ice-config", sessionActionLimit, requireMysqlAuth(["student", "psychologist"]), mysqlSessionIceConfiguration);
+api.post("/sessions/:sessionId/rating", sessionActionLimit, requireMysqlAuth(["student"]), mysqlRateSession);
+api.post("/sessions/:sessionId/escalate", sessionActionLimit, requireMysqlAuth(["student", "psychologist"]), mysqlEscalateSession);

@@ -1,19 +1,52 @@
 {
-  "name": "@bodhi/backend", "version": "1.0.0", "private": true, "type": "module",
+  "name": "@bodhi/backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts", "build": "tsc", "start": "node dist/server.js",
-    "typecheck": "tsc --noEmit", "test": "vitest run", "lint": "eslint src tests", "seed": "tsx src/seed.ts"
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src tests",
+    "seed": "tsx src/seed.ts",
+    "mysql:verify": "tsx src/database/verify-schema.ts",
+    "mysql:apply-schema": "tsx src/database/apply-schema.ts",
+    "mysql:smoke-runtime": "tsx src/database/smoke-mysql-runtime.ts",
+    "mysql:cutover-check": "tsx src/database/cutover-check.ts"
   },
   "dependencies": {
-    "@bodhi/shared": "*", "bcryptjs": "^3.0.2", "compression": "^1.8.0", "cors": "^2.8.5",
-    "dotenv": "^17.2.0", "express": "^5.1.0", "express-rate-limit": "^8.0.1", "helmet": "^8.1.0",
-    "jsonwebtoken": "^9.0.2", "mongoose": "^8.16.4", "morgan": "^1.10.0", "nodemailer": "^9.0.3",
-    "socket.io": "^4.8.1", "web-push": "^3.6.7", "zod": "^3.25.76"
+    "@bodhi/shared": "*",
+    "bcryptjs": "^3.0.2",
+    "compression": "^1.8.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.0.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "kysely": "^0.29.5",
+    "morgan": "^1.10.0",
+    "mysql2": "^3.24.2",
+    "nodemailer": "^9.0.3",
+    "socket.io": "^4.8.1",
+    "web-push": "^3.6.7",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/compression": "^1.8.1", "@types/cors": "^2.8.19", "@types/express": "^5.0.3",
-    "@types/jsonwebtoken": "^9.0.10", "@types/morgan": "^1.9.10", "@types/node": "^24.0.14",
-    "@types/nodemailer": "^6.4.17", "@types/web-push": "^3.6.4", "eslint": "^9.31.0",
-    "tsx": "^4.20.3", "typescript": "^5.8.3", "vitest": "^3.2.4"
+    "@types/compression": "^1.8.1",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/morgan": "^1.9.10",
+    "@types/node": "^24.0.14",
+    "@types/nodemailer": "^6.4.17",
+    "@types/web-push": "^3.6.4",
+    "eslint": "^9.31.0",
+    "socket.io-client": "^4.8.1",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
   }
 }

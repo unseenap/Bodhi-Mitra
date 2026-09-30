@@ -1,5 +1,5 @@
 -- Bodhi-Mitra production schema for MySQL 8.0.17+
--- Version: 2
+-- Version: 5
 -- Store all DATETIME values in UTC.
 -- Chat message bodies remain transient until a legal retention policy exists.
 
@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS users (
   UNIQUE KEY uq_users_email (email),
   UNIQUE KEY uq_users_id_role (id, role),
   KEY ix_users_role_state (role, verified, is_active),
+  KEY ix_users_role_created (role, created_at DESC),
+  KEY ix_users_role_active_created (role, is_active, created_at DESC),
   CONSTRAINT chk_users_uuid CHECK (
     user_uuid REGEXP '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
   ),
@@ -73,6 +75,7 @@ CREATE TABLE IF NOT EXISTS student_profiles (
   mobile_number VARCHAR(20) NOT NULL,
   department_id SMALLINT UNSIGNED NOT NULL,
   assessment_next_eligible_at DATETIME(3) NULL,
+  legacy_imported BOOLEAN NOT NULL DEFAULT FALSE,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
     ON UPDATE CURRENT_TIMESTAMP(3),
@@ -91,6 +94,16 @@ CREATE TABLE IF NOT EXISTS student_profiles (
     mobile_number REGEXP '^[+]91[6-9][0-9]{9}$'
   )
 ) ENGINE = InnoDB;
+
+-- Preserve inactive legacy/test accounts whose historical roll numbers predate
+-- the production format. All new application writes keep legacy_imported=FALSE.
+ALTER TABLE student_profiles
+  ADD COLUMN legacy_imported BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE student_profiles DROP CHECK chk_student_roll_number;
+ALTER TABLE student_profiles ADD CONSTRAINT chk_student_roll_number CHECK (
+  legacy_imported = TRUE
+  OR roll_number REGEXP '^[0-9]{3}U(CM|CS|CD|BT)[0-9]{3}$'
+);
 
 CREATE TABLE IF NOT EXISTS psychologist_profiles (
   user_id BIGINT UNSIGNED NOT NULL,
@@ -180,6 +193,9 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
       subscription
     )
   ),
+  CONSTRAINT chk_push_subscription_size CHECK (
+    JSON_STORAGE_SIZE(subscription) <= 16384
+  ),
   CONSTRAINT chk_push_endpoint_hash CHECK (
     endpoint_hash = UNHEX(
       SHA2(JSON_UNQUOTE(JSON_EXTRACT(subscription, '$.endpoint')), 256)
@@ -257,7 +273,10 @@ CREATE TABLE IF NOT EXISTS notifications (
     OR (LEFT(action_url, 1) = '/' AND LEFT(action_url, 2) <> '//')
   ),
   CONSTRAINT chk_notifications_channels CHECK (
-    JSON_TYPE(channels) = 'ARRAY'
+    JSON_SCHEMA_VALID(
+      '{"type":"array","minItems":1,"maxItems":4,"uniqueItems":true,"items":{"enum":["in_app","socket","push","email"]}}',
+      channels
+    )
   )
 ) ENGINE = InnoDB;
 
@@ -310,6 +329,7 @@ CREATE TABLE IF NOT EXISTS emergency_requests (
   KEY ix_emergency_timeout (status, timeout_at),
   KEY ix_emergency_student_history (student_id, created_at),
   KEY ix_emergency_psychologist_history (psychologist_id, matched_at),
+  KEY ix_emergency_created (created_at),
   CONSTRAINT fk_emergency_student FOREIGN KEY (student_id)
     REFERENCES student_profiles (user_id) ON UPDATE RESTRICT ON DELETE RESTRICT,
   CONSTRAINT fk_emergency_psychologist FOREIGN KEY (psychologist_id)
@@ -354,6 +374,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   KEY ix_sessions_student_active (student_id, ended_at),
   KEY ix_sessions_student_history (student_id, started_at),
   KEY ix_sessions_psychologist_history (psychologist_id, started_at),
+  KEY ix_sessions_started (started_at),
   CONSTRAINT fk_sessions_request FOREIGN KEY (request_id)
     REFERENCES emergency_requests (id) ON UPDATE RESTRICT ON DELETE RESTRICT,
   CONSTRAINT fk_sessions_student FOREIGN KEY (student_id)
@@ -440,6 +461,28 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   CONSTRAINT chk_audit_resolution CHECK (
     (resolved = FALSE AND resolved_at IS NULL)
     OR (resolved = TRUE AND resolved_at IS NOT NULL)
+  )
+) ENGINE = InnoDB;
+
+-- A database-backed lease prevents duplicate scheduled jobs when more than
+-- one API instance is running. Owners renew a short lease transactionally;
+-- an expired lease may be claimed by another healthy instance.
+CREATE TABLE IF NOT EXISTS scheduler_leases (
+  lease_name VARCHAR(120) NOT NULL,
+  owner_uuid CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  acquired_at DATETIME(3) NOT NULL,
+  heartbeat_at DATETIME(3) NOT NULL,
+  expires_at DATETIME(3) NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+    ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (lease_name),
+  KEY ix_scheduler_leases_expiry (expires_at),
+  CONSTRAINT chk_scheduler_lease_owner_uuid CHECK (
+    owner_uuid REGEXP '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+  ),
+  CONSTRAINT chk_scheduler_lease_times CHECK (
+    heartbeat_at >= acquired_at AND expires_at > heartbeat_at
   )
 ) ENGINE = InnoDB;
 
@@ -586,7 +629,7 @@ BEGIN
       AND emergency.student_id = NEW.student_id
       AND emergency.psychologist_id = NEW.psychologist_id
       AND emergency.mode = NEW.mode
-      AND emergency.status = 'matched'
+      AND emergency.status IN ('matched', 'ended')
   ) THEN
     SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'Session does not match an allocated emergency request';

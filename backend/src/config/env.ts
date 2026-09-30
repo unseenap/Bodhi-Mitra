@@ -7,10 +7,17 @@ const schema = z.object({
     .default("development"),
   PORT: z.coerce.number().default(4000),
   CLIENT_URL: z.string().url().default("http://localhost:5173"),
-  MONGODB_URI: z
-    .string()
+  DATABASE_URL: z.string().trim().min(1),
+  DATABASE_POOL_MIN: z.coerce.number().int().min(0).max(20).default(2),
+  DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
+  DATABASE_CONNECT_TIMEOUT_SECONDS: z.coerce
+    .number()
+    .int()
     .min(1)
-    .default("mongodb://127.0.0.1:27017/bodhi-mitra"),
+    .max(60)
+    .default(10),
+  DATABASE_SSL: z.enum(["disabled", "required"]).default("disabled"),
+  DATABASE_SSL_CA_BASE64: z.string().trim().optional(),
   JWT_SECRET: z
     .string()
     .min(32)
@@ -37,6 +44,12 @@ const schema = z.object({
   TURN_TTL_SECONDS: z.coerce.number().int().min(300).max(86400).default(3600),
 });
 export const env = schema.parse(process.env);
+if (env.DATABASE_POOL_MIN > env.DATABASE_POOL_MAX)
+  throw new Error("DATABASE_POOL_MIN cannot exceed DATABASE_POOL_MAX");
+if (env.DATABASE_URL && !/^mysql2?:\/\//i.test(env.DATABASE_URL))
+  throw new Error("DATABASE_URL must use the mysql:// protocol");
+if (env.DATABASE_SSL_CA_BASE64 && env.DATABASE_SSL !== "required")
+  throw new Error("DATABASE_SSL_CA_BASE64 requires DATABASE_SSL=required");
 if (env.NODE_ENV === "production") {
   if (env.JWT_SECRET === "development-only-secret-change-me-now")
     throw new Error("JWT_SECRET must be replaced in production");
